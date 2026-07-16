@@ -1,0 +1,3 @@
+[submodule "ccb"]
+	path = ccb
+	url = https://github.com/claude-code-best/claude-code.git

@@ -1,0 +1,29 @@
+# Harness 中控台
+
+北极星与 Spec 在 `docs/superpowers/`。  
+**实现基座：** git submodule [`ccb/`](./ccb/) → [claude-code-best/claude-code](https://github.com/claude-code-best/claude-code)（无头 Agent；不用其终端 UI）。
+
+## 克隆本仓
+
+```bash
+git clone --recurse-submodules <本仓 URL>
+# 若已克隆未拉 submodule：
+git submodule update --init --recursive
+```
+
+## 本地跑 CCB
+
+```bash
+export PATH="$HOME/.bun/bin:$PATH"
+cd ccb
+bun install   # 若尚未安装
+bun run build
+bun run dev   # 需真实终端 TTY；或 bun dist/cli-bun.js
+```
+
+首次在 REPL 内 `/login` 配置模型供应商。
+
+## 文档
+
+- [北极星架构](./docs/superpowers/specs/2026-07-17-harness-control-console-north-star-design.md)
+- [Spec 线](./docs/superpowers/specs/2026-07-17-harness-control-console-spec-line.md)
