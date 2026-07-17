@@ -32,6 +32,12 @@ bun run web:dev       # :5173 → proxy /api → :3100
 # 另开终端：bun run agent:dev  # CCB 无头 + Control MCP（fail-closed）
 ```
 
+**验收（fail-closed）：** 布局与单元测试须全部通过，否则脚本非零退出。
+
+```bash
+./scripts/acceptance-separation.sh
+```
+
 ## 文档
 
 - [北极星架构](./docs/superpowers/specs/2026-07-17-harness-control-console-north-star-design.md)
