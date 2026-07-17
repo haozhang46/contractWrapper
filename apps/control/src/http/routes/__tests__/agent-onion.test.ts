@@ -1,0 +1,35 @@
+import { describe, expect, test } from 'bun:test'
+import { Hono } from 'hono'
+import { createAgentOnionRoutes } from '../agent-onion.ts'
+import { PendingStore } from '../../../pending/store.ts'
+
+describe('agent onion HTTP', () => {
+  test('authorize allow', async () => {
+    const pending = new PendingStore({ defaultTimeoutMs: 60_000 })
+    const runtime = {
+      evaluate: async () =>
+        ({ decision: 'allow' as const, auditTrail: [] }),
+    }
+    const app = new Hono()
+    app.route(
+      '/api/agent/onion',
+      createAgentOnionRoutes({
+        workspaceRoot: '/tmp',
+        onionRuntime: runtime as any,
+        pendingStore: pending,
+      }),
+    )
+    const res = await app.request('/api/agent/onion/authorize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        toolName: 'WebSearch',
+        input: { query: 'weather' },
+        sessionId: 's1',
+      }),
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.decision).toBe('allow')
+  })
+})
