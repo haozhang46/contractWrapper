@@ -11,6 +11,7 @@
       "dependencies": {
         "@harness/onion": "workspace:*",
         "@harness/protocol": "workspace:*",
+        "@harness/slot": "workspace:*",
         "@modelcontextprotocol/sdk": "^1.12.0",
         "hono": "^4.12.0",
       },
@@ -42,6 +43,10 @@
     },
     "packages/protocol": {
       "name": "@harness/protocol",
+      "version": "0.0.1",
+    },
+    "packages/slot": {
+      "name": "@harness/slot",
       "version": "0.0.1",
     },
   },
@@ -151,6 +156,8 @@
     "@harness/onion": ["@harness/onion@workspace:packages/onion"],
 
     "@harness/protocol": ["@harness/protocol@workspace:packages/protocol"],
+
+    "@harness/slot": ["@harness/slot@workspace:packages/slot"],
 
     "@harness/web": ["@harness/web@workspace:apps/web"],
 
