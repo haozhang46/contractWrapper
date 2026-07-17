@@ -133,6 +133,10 @@ export class CcbSlot implements AgentSlot {
     return next
   }
 
+  private emitAborted(onEvent: (event: SlotEvent) => void): void {
+    onEvent({ type: 'error', message: 'Agent Slot / CCB 不可用: aborted' })
+  }
+
   private async runTurn(
     messages: Array<{ role: string; content: string }>,
     onEvent: (event: SlotEvent) => void,
@@ -143,11 +147,12 @@ export class CcbSlot implements AgentSlot {
     const id = crypto.randomUUID()
     this.currentTurnId = id
     this.turnAbort = new AbortController()
+    const localAbort = this.turnAbort
 
     const onAbort = () => this.abort()
     if (signal) {
       if (signal.aborted) {
-        onEvent({ type: 'error', message: 'Agent Slot / CCB 不可用: aborted' })
+        this.emitAborted(onEvent)
         this.currentTurnId = null
         return
       }
@@ -162,6 +167,15 @@ export class CcbSlot implements AgentSlot {
         message: `Agent Slot / CCB 不可用: ${err instanceof Error ? err.message : String(err)}`,
       })
       this.currentTurnId = null
+      if (signal) signal.removeEventListener('abort', onAbort)
+      return
+    }
+
+    // Abort may have fired during ensureChild before waiter was registered.
+    if (signal?.aborted || localAbort.signal.aborted) {
+      this.emitAborted(onEvent)
+      this.currentTurnId = null
+      if (signal) signal.removeEventListener('abort', onAbort)
       return
     }
 
@@ -172,11 +186,34 @@ export class CcbSlot implements AgentSlot {
         message: 'Agent Slot / CCB 不可用: child stdin unavailable',
       })
       this.currentTurnId = null
+      if (signal) signal.removeEventListener('abort', onAbort)
       return
     }
 
     await new Promise<void>((resolve, reject) => {
+      const settleAbort = () => {
+        const w = this.waiters.get(id)
+        if (!w) {
+          resolve()
+          return
+        }
+        this.waiters.delete(id)
+        w.onEvent({
+          type: 'error',
+          message: 'Agent Slot / CCB 不可用: aborted',
+        })
+        w.resolve()
+      }
+
+      // Account for pre-aborted controller: addEventListener('abort') never runs.
+      if (localAbort.signal.aborted || signal?.aborted) {
+        this.emitAborted(onEvent)
+        resolve()
+        return
+      }
+
       this.waiters.set(id, { onEvent, resolve, reject })
+      localAbort.signal.addEventListener('abort', settleAbort, { once: true })
 
       const cmd: TurnCommand = {
         type: 'turn',
@@ -196,15 +233,10 @@ export class CcbSlot implements AgentSlot {
         return
       }
 
-      const localAbort = this.turnAbort
-      const onLocalAbort = () => {
-        const w = this.waiters.get(id)
-        if (w) {
-          this.waiters.delete(id)
-          w.resolve()
-        }
+      // Re-check after write: abort may have raced with listener registration.
+      if (localAbort.signal.aborted || signal?.aborted) {
+        settleAbort()
       }
-      localAbort?.signal.addEventListener('abort', onLocalAbort, { once: true })
     }).finally(() => {
       if (signal) signal.removeEventListener('abort', onAbort)
       if (this.currentTurnId === id) this.currentTurnId = null

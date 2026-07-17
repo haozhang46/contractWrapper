@@ -104,4 +104,79 @@ describe('CcbSlot', () => {
     expect(slot).toBeInstanceOf(CcbSlot)
     ;(slot as CcbSlot).dispose()
   })
+
+  test('pre-aborted signal completes with terminal error (no hang)', async () => {
+    const slot = createTestSlot()
+    await slot.initSession({ workspaceRoot: '/tmp' })
+    const ac = new AbortController()
+    ac.abort()
+    const events: SlotEvent[] = []
+    await Promise.race([
+      slot.sendMessageWithHistory(
+        [{ role: 'user', content: 'hi' }],
+        e => events.push(e),
+        ac.signal,
+      ),
+      Bun.sleep(2000).then(() => {
+        throw new Error('turn hung after pre-aborted signal')
+      }),
+    ])
+    expect(events).toHaveLength(1)
+    expect(events[0]?.type).toBe('error')
+    if (events[0]?.type === 'error') {
+      expect(events[0].message).toContain('aborted')
+    }
+  })
+
+  test('abort during ensureChild does not hang the turn waiter', async () => {
+    const slot = createTestSlot()
+    await slot.initSession({ workspaceRoot: '/tmp' })
+    const ac = new AbortController()
+    const events: SlotEvent[] = []
+    const turn = slot.sendMessageWithHistory(
+      [{ role: 'user', content: 'hi' }],
+      e => events.push(e),
+      ac.signal,
+    )
+    // Fire during ensureChild's spawn race (before waiter registration).
+    queueMicrotask(() => ac.abort())
+    await Promise.race([
+      turn,
+      Bun.sleep(2000).then(() => {
+        throw new Error('turn hung after abort during ensureChild')
+      }),
+    ])
+    expect(events.some(e => e.type === 'error')).toBe(true)
+    const err = events.find(e => e.type === 'error')
+    if (err?.type === 'error') {
+      expect(err.message).toContain('aborted')
+    }
+  })
+
+  test('abort mid-turn emits terminal error and completes', async () => {
+    const slot = createTestSlot()
+    await slot.initSession({ workspaceRoot: '/tmp' })
+    const ac = new AbortController()
+    const events: SlotEvent[] = []
+    const turn = slot.sendMessageWithHistory(
+      [{ role: 'user', content: 'slow' }],
+      e => events.push(e),
+      ac.signal,
+    )
+    // Allow child spawn + turn write, then abort while fake-agent waits.
+    await Bun.sleep(80)
+    ac.abort()
+    await Promise.race([
+      turn,
+      Bun.sleep(2000).then(() => {
+        throw new Error('turn hung after mid-turn abort')
+      }),
+    ])
+    expect(events.some(e => e.type === 'error')).toBe(true)
+    expect(events.every(e => e.type !== 'done')).toBe(true)
+    const err = events.find(e => e.type === 'error')
+    if (err?.type === 'error') {
+      expect(err.message).toContain('aborted')
+    }
+  })
 })
