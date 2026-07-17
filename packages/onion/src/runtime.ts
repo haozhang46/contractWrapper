@@ -40,21 +40,7 @@ export class OnionRuntime {
     const raw = contract?.layers?.length
       ? contract.layers
       : DEFAULT_ONION_LAYERS
-    const hasAudit = raw.some(l => l.type === 'audit' && l.enabled)
-    this.layers = hasAudit
-      ? [...raw].sort((a, b) => a.priority - b.priority)
-      : [...DEFAULT_ONION_LAYERS.filter(l => l.type === 'audit'), ...raw].sort(
-          (a, b) => a.priority - b.priority,
-        )
-
-    const enabled = this.layers.filter(l => l.enabled)
-    const nonAuditEnabled = enabled.filter(l => l.type !== 'audit')
-    if (nonAuditEnabled.length === 0) {
-      this.middlewares = [this.createDenyAllMiddleware()]
-    } else {
-      this.middlewares = enabled.map(l => this.layerToMiddleware(l))
-    }
-    this.initialized = true
+    this.applyLayers(raw)
   }
 
   async evaluate(
@@ -96,27 +82,35 @@ export class OnionRuntime {
   }
 
   updateLayers(layers: OnionLayerConfig[]): void {
-    const hasAudit = layers.some(l => l.type === 'audit' && l.enabled)
-    this.layers = hasAudit
-      ? [...layers].sort((a, b) => a.priority - b.priority)
-      : [
-          ...DEFAULT_ONION_LAYERS.filter(l => l.type === 'audit'),
-          ...layers,
-        ].sort((a, b) => a.priority - b.priority)
-
-    const enabled = this.layers.filter(l => l.enabled)
-    const nonAuditEnabled = enabled.filter(l => l.type !== 'audit')
-    if (nonAuditEnabled.length === 0) {
-      this.middlewares = [this.createDenyAllMiddleware()]
-    } else {
-      this.middlewares = enabled.map(l => this.layerToMiddleware(l))
-    }
+    this.applyLayers(layers)
   }
 
   toContract(): ContractOnion {
     return {
       version: 1,
       layers: this.layers,
+    }
+  }
+
+  private applyLayers(raw: OnionLayerConfig[]): void {
+    const hasAudit = raw.some(l => l.type === 'audit' && l.enabled)
+    this.layers = hasAudit
+      ? [...raw].sort((a, b) => a.priority - b.priority)
+      : [...DEFAULT_ONION_LAYERS.filter(l => l.type === 'audit'), ...raw].sort(
+          (a, b) => a.priority - b.priority,
+        )
+
+    this.rebuildMiddlewares()
+    this.initialized = true
+  }
+
+  private rebuildMiddlewares(): void {
+    const enabled = this.layers.filter(l => l.enabled)
+    const nonAuditEnabled = enabled.filter(l => l.type !== 'audit')
+    if (nonAuditEnabled.length === 0) {
+      this.middlewares = [this.createDenyAllMiddleware()]
+    } else {
+      this.middlewares = enabled.map(l => this.layerToMiddleware(l))
     }
   }
 
