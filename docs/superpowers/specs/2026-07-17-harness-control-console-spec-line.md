@@ -1,7 +1,7 @@
 # Harness 中控台 — Spec 线
 
 **日期：** 2026-07-17  
-**状态：** Approved（任务切分 + 基座决策）  
+**状态：** Living（对照本仓实现维护；T4 已落地）  
 **上游：** [北极星架构](./2026-07-17-harness-control-console-north-star-design.md)  
 **用途：** 子 Spec 序列；每条线走 **Spec → 实现计划 → 实现**。
 
@@ -57,12 +57,12 @@ T1 章程+洋葱+空态Web壳（挂在 CCB 旁/上；尚可不驱满血 loop）
 
 | ID | 焦点 | 依赖 | 状态 |
 |----|------|------|------|
-| **T1** | 章程 + 洋葱 + Web 空态壳 + `.harness` 骨架 | — | 待写 Spec |
-| **T2** | Project MCP + AuthZ + 洋葱挂 call | T1 | 待写 |
-| **T3** | Fusion + Headless；Chat 等为 Headless components | T2 | 待写 |
-| **T4** | 极薄 Slot + 唯一实现 CCB（改 LLM）；不多厂商框架 | T1/T2 | 待写 |
-| **T5** | Skill + Subagent | T2, T4 | 待写 |
-| **T6** | Memory | T2, T4 | 待写 |
+| **T1** | 章程 + 洋葱 + Web 空态壳 + `.harness` 骨架 | — | 已落地（进程分离后在本仓 `apps/*` + `packages/onion`） |
+| **T2** | Project MCP + AuthZ + 洋葱挂 call | T1 | 已落地（Control onion HTTP + CCB bridge） |
+| **T3** | Fusion + Headless；Chat 等为 Headless components | T2 | 部分（Chat/Settings/Confirm 已在 Web） |
+| **T4** | 极薄 Slot + 唯一实现 CCB（改 LLM）；不多厂商框架 | T1/T2 | **已落地** — 见 [Slot+stdio 现行 Spec](./2026-07-17-harness-agent-slot-stdio-design.md) |
+| **T5** | Skill + Subagent | T2, T4 | Subagent **在 CCB 内**已可用；外层不编排（见 T4 Spec） |
+| **T6** | Memory | T2, T4 | 部分（Settings + extract API） |
 | **T7** | 其它 Slot 实现（以后） | T4, T5 | 待写 |
 | **T8** | Workflow 等业务插件 | T3, T5 | 待写 |
 
@@ -80,7 +80,7 @@ T1 章程+洋葱+空态Web壳（挂在 CCB 旁/上；尚可不驱满血 loop）
 - Web + Headless UI + Tailwind 为默认 Client/Render；接口可换。
 - Chat：占位或最小 Web；不接 CCB 终端 UI。
 
-**范围外：** 满血 CCB loop 产品化（T4）；完整 Headless JSON 运行时（T3）；远程 MCP。
+**范围外（T1 当时）：** 满血 CCB loop 产品化（→ **T4 已接 `ask()` / QueryEngine**）；完整 Headless JSON 运行时（T3）；远程 MCP。
 
 ---
 
@@ -98,9 +98,12 @@ Chat/确认卡等做成 Headless components；默认 Render = Headless UI + Tail
 
 ## T4 — 极薄 Slot + CCB（唯一实现）
 
-- **Slot**：最小接口（消息流 / 中断 / 权限确认回调等）；壳不直 import CCB 内部模块。
-- **唯一实现**：CCB 无头；**优先改 LLM/供应商**（如默认 DeepSeek）；本阶段不做多厂商绑定框架。
-- `canUseTool` → 洋葱；会话/tool 事件供自有 Web Chat。
+**现行 Spec：** [2026-07-17-harness-agent-slot-stdio-design.md](./2026-07-17-harness-agent-slot-stdio-design.md)（状态：Implemented）
+
+- **Slot**：`packages/slot` 最小接口；壳不 import CCB 内部模块。
+- **唯一实现**：`CcbSlot` → stdio → `stdioBridge` → `runCCBAgent` → **`ask()` / QueryEngine**（非 DIY OpenAI 环）。
+- **Loop / Subagent / schema 重试**：仅在 CCB；外层不转发 `parent_tool_use_id`。
+- `canUseTool` → 洋葱（HTTP）；会话持久化含顶层 `toolCalls`。
 - 以后换引擎：再加第二个 Slot 实现，不推翻壳。
 
 ---
@@ -111,4 +114,5 @@ Chat/确认卡等做成 Headless components；默认 Render = Headless UI + Tail
 
 ## 下一步
 
-开写 **T1 设计 Spec**（在 CCB 仓内如何挂 `harness/` 与 Web 壳），Approved 后再写实现计划并在 CCB fork 上开工。
+- T4 现行文档以 [Slot+stdio Spec](./2026-07-17-harness-agent-slot-stdio-design.md) 为准。
+- 后续可推进 T5 外层契约（若需要 Skill 产品面）、T7 第二 Slot、或加固天气/搜索 E2E。

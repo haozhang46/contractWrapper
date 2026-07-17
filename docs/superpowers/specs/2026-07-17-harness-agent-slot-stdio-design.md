@@ -1,43 +1,53 @@
 # Agent Slot + CCB stdio（Chat 走可换 Slot）
 
 **日期：** 2026-07-17  
-**状态：** Approved（用户确认）  
+**状态：** Implemented（对照本仓当前代码修订）  
 **上游：** [进程分离设计](./2026-07-17-harness-control-ccb-process-separation-design.md)、[北极星](./2026-07-17-harness-control-console-north-star-design.md)、[Spec 线 T4](./2026-07-17-harness-control-console-spec-line.md)  
-**补齐：** 进程分离后 Web Chat 仍直连 LLM、未进 Slot 的缺口（故无 WebSearch 等工具）
+**补齐：** 进程分离后 Web Chat 须经 Slot 进 CCB（工具 / 洋葱 / QueryEngine loop）
 
 ## 目标
 
-让主对话路径变为：**Web → Control `/api/chat` → `AgentSlot` →（默认）`CcbSlot` 经 stdio 调 CCB 子进程内 `ccb-runner`**。  
-壳只依赖 Slot 接口，便于以后换成其它实现；CCB 工具（含 WebSearch）与洋葱 MCP 热路径保持进程分离边界。
+主对话路径：
+
+**Web → Control `/api/chat` → `AgentSlot` →（默认）`CcbSlot` → stdio → CCB `stdioBridge` → `runCCBAgent` → CCB `ask()` / QueryEngine**
+
+壳只依赖 `packages/slot`；CCB 拥有唯一 agent loop、工具、subagent、schema 与校验重试。
 
 ## 已拍板决策
 
 | 主题 | 选择 |
 |------|------|
-| 主 Agent 入口 | **只经 `AgentSlot`**；`/api/chat` 不得再直连 LLM completions 作为主路径 |
-| 默认可换实现 | **`CcbSlot`**：本机子进程 + **stdio** JSON 行协议 |
-| 工具执行位置 | **CCB 进程内**（既有 / 迁回的 `ccb-runner` + CCB tools） |
-| 权限 | 仍走 **Control MCP** `onion.authorize` / `wait_resolve`；fail-closed |
-| Slot 可换含义 | 可换的是 **TS `AgentSlot` 实现**；stdio 只是 CcbSlot 的传输细节 |
-| CCB 不可用 | **显式报错**，不静默降级回纯 LLM（避免再次误判「没有 WebSearch」） |
+| 主 Agent 入口 | **只经 `AgentSlot`**；`/api/chat` 不直连 LLM completions |
+| 默认可换实现 | **`CcbSlot`**：本机子进程 + **stdio** JSONL |
+| Agent loop | **仅 CCB** `ask()` → `QueryEngine` → `query()`（与 ACP / `-p` 同路径） |
+| Slot / runner | **无 loop**：只 bootstrap + SDKMessage→SlotEvent 投影 |
+| 工具执行 | CCB 进程内 `tool.call`；权限经洋葱 |
+| Subagent | **完全在 CCB 内**；外层不转发 `parent_tool_use_id` |
+| 权限 | Control onion HTTP（`authorize` / `wait_resolve`）；fail-closed；**不经 Slot** |
+| CCB 不可用 | 显式 SSE `error`，不静默降级纯 LLM |
 
 ## 非目标
 
-- HTTP / Remote Slot 适配器（以后可另加，不阻塞本切片）
-- 多 CCB 池化、跨机 SSH/远程 Agent
-- 重做洋葱、Memory、LLM Settings CRUD
-- 把产品代码重新塞回 `ccb/harness/**` 大树（仅允许 **stdio bridge + runner** 等薄 Agent 侧代码）
+- HTTP / Remote Slot 适配器
+- 多 CCB 池化、跨机 Agent
+- 外层展示 / 编排 subagent 嵌套 UI
+- 调用 `runHeadless`（会污染 Chat JSONL stdout）
+- 把产品壳重新塞回 `ccb/harness/**` 大树
 
 ## 架构
 
-### 组件
+### 组件（当前落点）
 
 ```text
-packages/slot/          ← AgentSlot + SlotEvent（壳唯一依赖）
-apps/control/           ← /api/chat → slot；spawn/管理 CCB 子进程
-apps/web/               ← 仍消费现有 SSE 事件形状（对齐 SlotEvent）
-ccb/                    ← stdio bridge 入口 + ccb-runner（工具循环）
-                          + 既有 MCP onion 钩子
+packages/slot/                 ← AgentSlot + SlotEvent
+apps/control/src/slot/         ← CcbSlot、factory、jsonl
+apps/control/src/http/routes/  ← /api/chat → slot SSE
+apps/web/                      ← ChatPanel 消费 SSE；会话持久化含 toolCalls
+ccb/src/harness/
+  stdioBridge.ts               ← JSONL 协议
+  ccb-runner.ts                ← bootstrap + ask()
+  mapSdkToSlot.ts              ← SDKMessage → SlotEvent（滤掉 subagent）
+  mcpOnionBridge.ts            ← 洋葱 HTTP client 钩子
 ```
 
 ```mermaid
@@ -46,111 +56,118 @@ flowchart LR
   Chat["Control /api/chat"]
   Slot["AgentSlot"]
   CcbSlot["CcbSlot"]
-  Proc["CCB 子进程\nstdio bridge + ccb-runner"]
-  MCP["Control MCP\nonion.*"]
+  Bridge["stdioBridge"]
+  Runner["runCCBAgent"]
+  QE["ask / QueryEngine / query"]
+  Onion["Control onion HTTP"]
 
   Web -->|HTTP SSE| Chat
   Chat --> Slot
   Slot --> CcbSlot
-  CcbSlot -->|stdin/stdout JSONL| Proc
-  Proc -->|MCP client| MCP
+  CcbSlot -->|JSONL| Bridge
+  Bridge --> Runner
+  Runner --> QE
+  QE -->|tool.call + permissions| Onion
 ```
 
-### 洋葱怎么进 CCB（与「runner 直接跑 tool」不矛盾）
-
-`ccb-runner` **不裁决权限**，只负责 LLM↔tool 循环。每次真正执行 tool 时走 CCB 既有权限入口：
-
-```text
-ccb-runner
-  → tool.call(..., hasPermissionsToUseTool, ...)
-    → permissions.ts（HARNESS_ONION_MCP=1）
-      → mcpOnionBridge.authorizeViaMcp
-        → Control MCP：onion.authorize
-        → 若 needs_confirm → onion.wait_resolve（Web 确认）
-    → allow 才继续执行 WebSearch 等；deny / MCP 不可达 → fail-closed
-```
-
-要点：
+### 职责分层
 
 | 层 | 干什么 | 不干什么 |
 |----|--------|----------|
-| Slot / stdio | 传 turn 与 `SlotEvent` | 不跑洋葱 |
-| `ccb-runner` | 调 LLM + `tool.call` | 不本地裁决 L1–L3 |
-| `mcpOnionBridge` + `permissions.ts` | MCP client 问 Control | 不实现洋葱链 |
-| Control `packages/onion` | 唯一洋葱 runtime | — |
+| Slot / CcbSlot | turn 进、SlotEvent 出、abort | 无 agent loop、无 subagent 编排 |
+| `stdioBridge` | JSONL 编解码、turn 终态 | 不调 LLM |
+| `ccb-runner` | env / tools / commands / agents bootstrap；调 `ask()`；映射事件 | 不 DIY OpenAI tool 环；不裁决洋葱 |
+| QueryEngine / `query.ts` | schema、工具循环、校验重试、commands、**subagent** | — |
+| onion bridge + Control | L1–L3 授权 / 确认 | — |
 
-stdio bridge **启动 CCB 子进程时必须**：
+### 洋葱（与 loop 分离）
 
-1. `HARNESS_ONION_MCP=1`
-2. `setControlMcpClient(...)` 注册 BridgeClient；实现上对 **同一 Control HTTP** 调 `/api/agent/onion/authorize` 与 `/wait_resolve`（与 MCP handlers 共用洋葱 runtime）。原因：Control 进程级 MCP 占 stdio，不能与 Chat JSONL 管道共用。
-3. 未注册 client → 任何 tool **deny**（已有 fail-closed）
+```text
+ask() / toolExecution
+  → hasPermissionsToUseTool
+    → HARNESS_ONION_MCP=1 时 authorizeViaMcp
+      → Control HTTP：/api/agent/onion/authorize
+      → needs_confirm → wait_resolve（Web ConfirmBanner）
+    → allow 才执行；deny / 不可达 → fail-closed
+```
 
-两条通道并存、职责不同：
+启动 CCB 子进程须：`HARNESS_ONION_MCP=1` + 注册 HTTP BridgeClient（Chat 占 stdio，洋葱走 HTTP）。
 
-- **Chat stdio**：Control → CCB（对话 / 事件）
-- **Onion HTTP（同 handlers）**：CCB → Control（工具授权；语义等同 MCP `onion.*`）；`bun run dev` 下 Control 始终挂载 `/api/agent/onion`，Chat 工具链不依赖 `HARNESS_MCP=1`
+### Agent loop（唯一）
 
-### `AgentSlot` 最小面（本仓）
+`runCCBAgent`：
 
-与旧 worktree `harness/slot/types.ts` 对齐，至少包含：
+1. 读 `.harness/llm.json` → 写 OpenAI 兼容 env（若 provider=openai）
+2. `enableConfigs`、`getTools`、`getCommands`、`getAgentDefinitionsWithOverrides`
+3. `ask({ includePartialMessages: true, canUseTool: hasPermissionsToUseTool, agents, commands, ... })`
+4. `mapSdkToSlot`：顶层 `text-delta` / `tool-call` / `tool-result` / `done` / `error`
+5. **丢弃**带 `parent_tool_use_id` 的事件（subagent 仅 CCB 内部）
 
-- `initSession(config)` / `getSession()`
+历史：`messages.slice(0,-1)` → `mutableMessages`；最后一条 user → `prompt`。
+
+### `AgentSlot` 面
+
+- `initSession` / `getSession`
 - `sendMessageWithHistory(messages, onEvent, signal?)`
-- `abort()`
-- （可选本轮）`respondToPermission` — 若 L3 仍完全由 MCP `wait_resolve` + Web pending 完成，Slot 可不暴露权限回调；**本切片默认：权限不经 Slot，只经 MCP**
+- `abort(signal?)` — 仅 abort **本 signal 拥有的** in-flight turn（避免排队断开误杀）
+- 权限确认 **不**经 Slot（Web pending + onion wait_resolve）
 
-### `SlotEvent`（与现 Chat SSE 对齐）
+### `SlotEvent`
 
 - `text-delta` | `tool-call` | `tool-result` | `done` | `error`
-- Control 把事件原样（或薄映射）写成现有 `data: {...}\n\n` SSE，避免大改 Web
+- `tool-call.toolCall`：`{ id, toolName, input, output?, status }`（`status` 含 `error`）
+- 仅顶层 tool；无 `parentToolUseId`
 
-### CcbSlot ↔ CCB stdio 约定
+### CcbSlot ↔ stdio
 
-- **一行一条 JSON**（JSONL）；stderr 仅日志，不承载协议
-- Control → CCB 示例：`{ "type": "turn", "id": "...", "messages": [...], "workspaceRoot": "..." }`
-- CCB → Control：与 `SlotEvent` 同形，并带 `id` 关联 turn；结束必须有 `done` 或 `error`
-- Control → CCB：`{ "type": "abort", "id": "..." }`（与 HTTP abort / `slot.abort()` 对应）
-- 进程模型：**Control 懒启动并复用一个长期子进程**（多 turn 共享）；崩溃则下次 turn 重启；并发 turn 用 `id` 区分或本切片先 **串行化**（实现计划里二选一，默认 **串行** 降复杂度）
+- JSONL；stderr 仅日志
+- → `{ type: "turn", id, messages, workspaceRoot }`
+- ← SlotEvent + `id`；必须 `done` 或 `error` 收尾
+- → `{ type: "abort", id }`
+- 长期子进程复用；turn **串行**
 
-### CCB 侧
+### Web / 会话（当前行为）
 
-- 新增薄入口（例如 `ccb/src/harness/stdioBridge.ts` 或等价）：读 stdin → 调 `runCCBAgent` → 写 stdout
-- `ccb-runner`：从旧 T1 worktree 迁入 CCB fork 的薄目录（**不是**整棵 `ccb/harness` 产品树）
-- **Agent loop：** `runCCBAgent` 只 bootstrap 并调用 CCB `ask()` / QueryEngine（commands + agents 全开）；不做 DIY OpenAI tool 循环。详见 [query loop 设计](./2026-07-17-harness-ccb-query-loop-design.md)
-- 启动时挂上既有 Control MCP client（onion）；连不上则工具 fail-closed
+- ChatPanel：tool 区在正文上方；output **默认折叠**
+- 会话 PUT/GET 持久化 assistant `toolCalls`（刷新后仍可见）
+- Headless auto-allow 等仍走既有 Settings，与 Slot 正交
 
-### `/api/chat` 行为变更
+### `/api/chat`
 
-1. 校验 messages、workspaceRoot、LLM 配置（key 仍可由 runner 读 `.harness/llm.json`）
-2. 取默认 `AgentSlot`（factory → `CcbSlot`）
-3. `sendMessageWithHistory` → SSE 转发事件
-4. 客户端断开 → `abort()`
-5. **删除**（或降级到仅测试开关）当前直连 `chat/completions` 主路径
+1. 校验 messages / workspace
+2. factory → 默认 `CcbSlot`
+3. SSE 转发 SlotEvent
+4. 断开 → 作用域内 `abort(signal)`
+5. 无直连 completions 主路径
 
 ## 错误与边界
 
 | 情况 | 行为 |
 |------|------|
-| 子进程起不来 / stdio 断 | SSE `error`，文案明确「Agent Slot / CCB 不可用」 |
-| turn 超时 | abort 子进程 turn + `error` |
-| MCP 不可达 | 工具 deny（既有）；模型侧可见 tool 失败结果 |
-| 换 Slot | 改 factory 绑定；`/api/chat` 与 Web 不变 |
+| 子进程 / stdio 失败 | SSE `error`（Agent Slot / CCB 不可用） |
+| turn abort | 终态 `error`（必要时再 `done`，见 stdioBridge 终态约定） |
+| 工具校验 / 执行失败 | 顶层 `tool-call` `status: error` + 可读 output；QueryEngine 内可重试 |
+| 洋葱不可达 | tool deny |
+| Subagent 内部失败 | 外层不可见细节；体现在父级 Agent tool 结果中 |
 
-## 验收
+## 验收（对照当前实现）
 
-1. 问「某城市天气」时，链路出现 **WebSearch（或等价联网 tool）** 的 `tool-call` / `tool-result`，且最终回答含实时信息（或明确的 tool 失败原因），不再出现「我无法获取实时天气、请告诉城市」这类纯无工具话术（在 key 与网络正常时）
-2. `apps/web` / `apps/control` **不** `import` CCB 内部 `src/tools` 等模块
-3. 停掉 Control MCP 或模拟不可达 → 特权/需授权 tool 被拒绝（fail-closed）
-4. 换一个 mock `AgentSlot` 实现时，`/api/chat` 无需改路由签名即可跑通假事件流（单测或轻集成）
+1. Chat 经 Slot→CCB；天气等场景可出现顶层联网 tool（或明确 tool 失败），非整段「无工具」话术
+2. `apps/web` / `apps/control` 不 import CCB `src/tools`
+3. 洋葱 fail-closed 仍成立
+4. mock `AgentSlot` 可换（factory 单测）
+5. **无** DIY OpenAI tool loop；stderr 可见 `ask() with N tools…`
+6. 刷新后会话仍保留 `toolCalls`
+7. 外层 UI **无** subagent 嵌套树
 
-## 测试策略
+## 测试
 
-- **单测：** JSONL 编解码、`CcbSlot` 对假子进程的 turn/abort
-- **单测：** `/api/chat` 在 Slot 返回 `error` 时的 SSE 形状
-- **集成（可选本切片）：** 真子进程 + mock LLM 或录制；天气 E2E 可手工验收
+- `ccb/src/harness/__tests__/`：mapSdkToSlot（含「不转发 subagent」）、abort、onion HTTP、formatToolResult
+- Control：chat-sessions 含 toolCalls 持久化；CcbSlot / factory 单测
+- 天气 E2E：手工（需 LLM + 搜索 key）
 
-## 与既有文档关系
+## 与既有文档
 
-- 进程分离「独立 CCB 进程」：**保留**；本设计明确 Chat 如何接到该进程（stdio，由 Control spawn）
-- Spec 线 **T4 极薄 Slot + CCB**：本设计即其进程分离后的落地形态
-- 旧 worktree `ccb/harness/slot/*`：接口与 runner 为参考实现；产品壳侧接口落在本仓 `packages/slot`
+- 进程分离：保留；本文件为 Chat 接入形态的 **现行** 说明
+- Spec 线 **T4**：本设计即落地；loop 产品化 = 已接 `ask()` / QueryEngine
+- 子文档 [query loop](./2026-07-17-harness-ccb-query-loop-design.md)：loop 边界摘要（细节以本文为准）
