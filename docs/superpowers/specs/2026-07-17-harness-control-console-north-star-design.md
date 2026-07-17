@@ -159,6 +159,13 @@ flowchart TB
 3. **Skill 包（人格 + 流程 · 沉淀之一）**  
    - 承载专职人格 + 可复用流程；Primary/Subagent 可加载。  
    - 使用中可由主 Agent 提议生成/演进，经 MCP 落盘（用户可改）。  
+   - **前端技能分类（对应架构层）：**
+     - **⓪⑤ UI 层** — CSS 实践（BEM 命名、Grid/Flexbox、rem/px 单位、z-index 具名规范）、图片优化（懒加载/BlurHash/srcset/CDN 裁剪）、字体加载（unicode-range、CJK 子集化、font-display）
+     - **① 人格层** — React 组件设计（命名 hooks、ErrorBoundary、Suspense、组件拆分决策）、Next.js Hydration 安全（客户端/服务端边界、列表 key、browser API 隔离）
+     - **② 契约层** — 前端安全（XSS/CSRF/CSP/CORS/IDOR/postMessage 域名白名单）、DTO Mapper 转换（API 原始响应 → UI 就绪 DTO）
+     - **③④ 数据/外围** — Axios/Fetch 约定（拦截器、取消、重试、SSE 流、httpOnly cookie）、API Codegen（OpenAPI/GraphQL → TS 类型 + hooks）
+     - **全层横切** — 前端监控（错误上报、行为打点、Web Vitals、Sentry）、国际化（ICU 格式、locale 路由）、JS/TS 编码约定、Vite/Webpack 工程化、Monorepo 约定
+     - **移动端** — RN SafeArea/Keyboard、OTA 更新、WebView 性能、Expo 原生模块、UniApp 分包  
 
 4. **Memory（事实/偏好 · 沉淀之二）**  
    - 跨会话「记得什么」：偏好、决策、项目事实等；**不是**整包流程（流程归 Skill）。  
@@ -207,7 +214,7 @@ flowchart TB
 |------|------|------|
 | **Workspace 章程（Charter）** | 主 Agent 人格/用途等软上下文；用户/主 Agent 可改 | 绕过洋葱链 |
 | **Contract Onion（契约链）** | 有序中间件层：限制/沙箱判断；Settings CRUD+排序；调用必经 | 关闭运行时；层内提权绕过外层 |
-| **Skill 包** | 沉淀：人格 + 流程 | 绕过洋葱；代替 Memory |
+| **Skill 包** | 沉淀：人格 + 流程；按架构层分类（ui/persona/contract/data/crosscut/mobile） | 绕过洋葱；代替 Memory |
 | **Memory** | 沉淀：事实/偏好/决策 | 覆盖契约层 |
 | **Subagent（薄壳）** | 委派单元；绑定 Skill；调用同样穿洋葱 | 自带完整人设；旁路 MCP |
 | **Onion Runtime** | Koa 式执行引擎 + 审计钩子 | 绑定某一 LLM/客户端 |
@@ -232,7 +239,13 @@ flowchart TB
 - `shell.settings` — Settings（章程、**契约洋葱 CRUD/排序**、LLM、Primary Agent、远程、Fusion）  
 - `contract.onion` — 契约链文档（用户可增删改排序）  
 - `workspace.charter` — 章程（约束主 Agent；硬禁令全员）  
-- `skill.*` — Skill 沉淀（人格 + 流程）  
+- `skill.*` — Skill 沉淀（人格 + 流程），按架构层分类：
+  - `skill.ui.*` — UI 层（CSS 实践、图片优化、字体加载）
+  - `skill.persona.*` — 人格层（React 组件设计、Next.js Hydration 安全）
+  - `skill.contract.*` — 契约层（前端安全、DTO Mapper）
+  - `skill.data.*` — 数据层（HTTP 约定、API Codegen）
+  - `skill.crosscut.*` — 横切（前端监控、国际化、编码约定、工程化）
+  - `skill.mobile.*` — 移动端（RN、WebView、Expo、UniApp）  
 - `memory.*` — Memory 沉淀（recall/store；实现可换）  
 - `subagent.*` — Subagent 薄壳  
 - `subagent.delegate` — MCP 委派  
@@ -313,6 +326,68 @@ flowchart TB
 - Memory 与 Skill 分离；都不能绕过洋葱。  
 - 换客户端/主 Agent 适配器不改洋葱协议。  
 
+## Skill 分类体系（对应北极星架构层）
+
+前端技能按北极星架构分层组织，每层技能服务对应架构层的职责：
+
+```text
+⓪ 客户端 Layer ─────────────────────────────────────────────
+│  skill.mobile.*          RN SafeArea/Keyboard、OTA 更新、WebView 性能、
+│                          Expo 原生模块、UniApp 分包
+│
+⑤ Headless UI · 磁盘 ───────────────────────────────────────
+│  skill.ui.css             CSS 实践（BEM 命名、Grid/Flexbox 选择、
+│                           rem/px 单位、z-index 具名规范、1px 方案）
+│  skill.ui.image           图片优化（懒加载、BlurHash、srcset/picture、
+│                           CDN 动态裁剪、渐进式加载）
+│  skill.ui.font            字体加载（unicode-range 按需加载、CJK 子集化、
+│                           font-display 策略、系统字体替代）
+│
+① 人格 · 章程 ──────────────────────────────────────────────
+│  skill.persona.react      React 组件设计（命名 hooks、ErrorBoundary、
+│                           Suspense、组件拆分决策、forwardRef/cloneElement 禁用）
+│  skill.persona.nextjs     Next.js Hydration 安全（客户端/服务端边界、
+│                           列表 key 稳定 ID、browser API 隔离）
+│
+② 契约 · 洋葱链 ────────────────────────────────────────────
+│  skill.contract.security  前端安全（XSS/DOMPurify、CSRF/Token 存储、
+│                           CSP/CORS 策略、IDOR 防护、postMessage 域名白名单）
+│  skill.contract.dto       DTO Mapper 层（API 原始响应 → UI 就绪 DTO、
+│                           camelCase 转换、纯函数可测试）
+│
+③④ 数据 / 外围 ────────────────────────────────────────────
+│  skill.data.fetch         Axios/Fetch 约定（httpOnly cookie、
+│                           拦截器、取消/重试、SSE 流、blob 下载）
+│  skill.data.codegen       API Codegen（OpenAPI/GraphQL → TS 类型 + hooks）
+│
+全层横切 ──────────────────────────────────────────────────
+│  skill.crosscut.monitor   前端监控（错误上报 sendBeacon、行为打点、
+│                           Web Vitals、Sentry 接入）
+│  skill.crosscut.i18n      国际化（next-intl、ICU 格式、locale 路由）
+│  skill.crosscut.js        JS 编码约定（Optional chaining、nullish
+│                           coalescing、early return、flat conditionals）
+│  skill.crosscut.ts        TS 编码约定（Atomic types、composition、
+│                           enum 模式、type guards）
+│  skill.crosscut.vite      Vite 约定（HMR 优化、esbuild、env 文件）
+│  skill.crosscut.monorepo  Monorepo 约定（pnpm workspaces、Turborepo、
+│                           共享包规则）
+```
+
+| 架构层 | skill 命名空间 | 覆盖技能 | 加载时机 |
+|--------|--------------|---------|---------|
+| ⓪⑤ UI | `skill.ui.*` | CSS、图片、字体 | 渲染时按需 |
+| ① 人格 | `skill.persona.*` | React 组件、Next.js Hydration | Agent 初始化 |
+| ② 契约 | `skill.contract.*` | 前端安全、DTO Mapper | 每次数据流经 |
+| ③④ 数据 | `skill.data.*` | HTTP 约定、API Codegen | 数据请求时 |
+| 横切 | `skill.crosscut.*` | 监控、i18n、编码约定、工程化 | Session 常驻 |
+| 移动端 | `skill.mobile.*` | RN、WebView、Expo、UniApp | 平台初始化 |
+
+**原则：**
+- Skill 按架构层命名空间组织，Subagent 按需加载对应层技能
+- 每层 Skill 不跨层访问（UI 层不直接调数据层 API，必须经契约洋葱）
+- Skill 沉淀可通过 MCP 自动/半自动生成，用户可在 Settings 编辑
+- 与 Memory 分离：Skill = 怎么做（流程+人格），Memory = 记得什么（事实+偏好）
+
 ## 建议后续 Spec（拆分顺序）
 
 1. **章程 + 洋葱运行时骨架 + 空态 Shell + 首发客户端**（Settings 先做层列表 CRUD）。  
@@ -341,6 +416,7 @@ flowchart TB
 - Workflow 图 schema、运行时与 MCP 工具面（作为 Fusion 插件子 spec）。  
 - 契约洋葱层 schema、默认层集合、强制保留的 `audit` 层是否可删。  
 - Skill / Subagent / Memory schema 与 MCP 工具。  
+- Skill 命名空间 schema（`skill.{layer}.{domain}`）与各层 Skill 的加载/卸载协议。  
 - 各适配器挂载 MCP。  
 - NSFW 策略。  
 - 首发客户端选型。

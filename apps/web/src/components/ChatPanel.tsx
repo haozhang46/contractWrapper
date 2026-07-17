@@ -1,59 +1,85 @@
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import type { ChatMessage, ToolCallEvent } from '../types/chat'
-
-interface SessionMeta {
-  id: string
-  title: string
-  createdAt: string
-  updatedAt: string
-}
+import { toSessionMetaList, toSessionDetail, type SessionMetaDTO } from '../mappers/chat-sessions'
+import {
+  applyChatStreamEvent,
+  markAssistantComplete,
+} from './applyChatStreamEvent'
+import { deriveChatStatus } from './deriveChatStatus'
 
 export default function ChatPanel(): ReactElement {
-  const [sessions, setSessions] = useState<SessionMeta[]>([])
+  const [sessions, setSessions] = useState<SessionMetaDTO[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
+  const [pendingConfirm, setPendingConfirm] = useState(false)
   const [composing, setComposing] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [memToast, setMemToast] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
-  useEffect(() => {
-    scrollRef.current &&
-      (scrollRef.current.scrollTop = scrollRef.current.scrollHeight)
+  useEffect(function scrollToBottom() {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
   }, [messages])
 
-  const loadSessions = useCallback(async () => {
+  // While streaming, watch pending confirms so status can explain "stuck" waits.
+  useEffect(function pollPendingConfirms() {
+    if (!streaming) {
+      setPendingConfirm(false)
+      return
+    }
+    let closed = false
+    const poll = async () => {
+      try {
+        const res = await fetch('/api/pending')
+        if (!res.ok || closed) return
+        const data = (await res.json()) as { pending?: unknown[] }
+        if (!closed) setPendingConfirm((data.pending?.length ?? 0) > 0)
+      } catch {
+        // Transient — status bar is advisory, not critical
+      }
+    }
+    void poll()
+    const timer = setInterval(poll, 1500)
+    return () => {
+      closed = true
+      clearInterval(timer)
+    }
+  }, [streaming])
+
+  const loadSessions = useCallback(async function loadSessions() {
     try {
       const res = await fetch('/api/chat-sessions')
       const data = await res.json()
-      setSessions(data.sessions ?? [])
+      setSessions(toSessionMetaList(data.sessions))
     } catch {
       // chat API may be unavailable until later tasks
     }
   }, [])
 
-  useEffect(() => {
+  useEffect(function loadSessionsOnMount() {
     void loadSessions()
   }, [loadSessions])
 
-  const openSession = useCallback(async (id: string) => {
+  const openSession = useCallback(async function openSession(id: string) {
     try {
       const res = await fetch(`/api/chat-sessions/${id}`)
       const data = await res.json()
-      if (data.messages) {
-        setActiveId(id)
+      const detail = toSessionDetail(data)
+      if (detail.messages.length > 0) {
+        setActiveId(detail.id)
         setMessages(
-          data.messages.map(
-            (m: { role: ChatMessage['role']; content: string }) => ({
-              id: crypto.randomUUID(),
-              role: m.role,
-              content: m.content,
-              timestamp: new Date().toISOString(),
-              status: 'complete' as const,
-            }),
-          ),
+          detail.messages.map(m => ({
+            id: crypto.randomUUID(),
+            role: m.role,
+            content: m.content,
+            timestamp: new Date().toISOString(),
+            status: 'complete' as const,
+          })),
         )
       }
     } catch {
@@ -62,7 +88,7 @@ export default function ChatPanel(): ReactElement {
   }, [])
 
   const saveSession = useCallback(
-    async (msgs: ChatMessage[], title?: string) => {
+    async function saveSession(msgs: ChatMessage[], title?: string) {
       const id = activeId ?? `chat_${Date.now()}`
       if (!activeId) setActiveId(id)
       try {
@@ -86,18 +112,25 @@ export default function ChatPanel(): ReactElement {
     [activeId, loadSessions],
   )
 
-  const newChat = () => {
+  const newChat = useCallback(function newChat() {
+    abortRef.current?.abort()
+    abortRef.current = null
     setActiveId(null)
     setMessages([])
-  }
+    setStreaming(false)
+  }, [])
 
-  const deleteSession = async (id: string) => {
+  const deleteSession = useCallback(async function deleteSession(id: string) {
     await fetch(`/api/chat-sessions/${id}`, { method: 'DELETE' })
     if (activeId === id) newChat()
     void loadSessions()
-  }
+  }, [activeId, loadSessions, newChat])
 
-  const handleSend = async () => {
+  const handleStop = useCallback(function handleStop() {
+    abortRef.current?.abort()
+  }, [])
+
+  const handleSend = useCallback(async function handleSend() {
     if (!input.trim() || streaming) return
 
     const userMsg: ChatMessage = {
@@ -121,6 +154,9 @@ export default function ChatPanel(): ReactElement {
     setInput('')
     setStreaming(true)
 
+    const ac = new AbortController()
+    abortRef.current = ac
+
     try {
       const apiMessages = history
         .filter(m => m.role === 'user' || m.role === 'assistant')
@@ -130,6 +166,7 @@ export default function ChatPanel(): ReactElement {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: apiMessages }),
+        signal: ac.signal,
       })
 
       if (!response.ok) throw new Error(`Server error: ${response.status}`)
@@ -151,12 +188,7 @@ export default function ChatPanel(): ReactElement {
           if (!line.startsWith('data: ')) continue
           const data = line.slice(6)
           if (data === '[DONE]') {
-            setMessages(prev => {
-              const updated = [...prev]
-              const last = updated[updated.length - 1]
-              if (last?.role === 'assistant') last.status = 'complete'
-              return updated
-            })
+            setMessages(markAssistantComplete)
             break
           }
           try {
@@ -166,26 +198,30 @@ export default function ChatPanel(): ReactElement {
               message?: string
               toolCall?: ToolCallEvent
             }
-            setMessages(prev => {
-              const updated = [...prev]
-              const last = updated[updated.length - 1]
-              if (!last || last.role !== 'assistant') return prev
-              if (event.type === 'text-delta' && event.content) {
-                last.content += event.content
-                fullContent += event.content
-              } else if (event.type === 'tool-call' && event.toolCall) {
-                if (!last.toolCalls) last.toolCalls = []
-                last.toolCalls.push(event.toolCall)
-              } else if (event.type === 'error') {
-                last.content += `\n\n[Error: ${event.message ?? 'unknown'}]`
-                last.status = 'error'
-              }
-              return updated
-            })
+            if (event.type === 'text-delta' && event.content) {
+              fullContent += event.content
+            }
+            setMessages(prev => applyChatStreamEvent(prev, event))
           } catch {
             // ignore malformed stream chunks
           }
         }
+      }
+
+      if (ac.signal.aborted) {
+        setMessages(prev => {
+          const last = prev[prev.length - 1]
+          if (!last || last.role !== 'assistant') return prev
+          return [
+            ...prev.slice(0, -1),
+            {
+              ...last,
+              status: 'complete',
+              content: last.content || '(stopped)',
+            },
+          ]
+        })
+        return
       }
 
       const finalHistory: ChatMessage[] = [
@@ -220,60 +256,72 @@ export default function ChatPanel(): ReactElement {
         })
         .catch(() => {})
     } catch (err) {
-      setMessages(prev => {
-        const updated = [...prev]
-        const last = updated[updated.length - 1]
-        if (last?.role === 'assistant') {
-          last.content += `\n\n[Error: ${String(err)}]`
-          last.status = 'error'
-        }
-        return updated
-      })
+      if (ac.signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
+        setMessages(prev => {
+          const last = prev[prev.length - 1]
+          if (!last || last.role !== 'assistant') return prev
+          return [
+            ...prev.slice(0, -1),
+            {
+              ...last,
+              status: 'complete',
+              content: last.content || '(stopped)',
+            },
+          ]
+        })
+      } else {
+        setMessages(prev =>
+          applyChatStreamEvent(prev, {
+            type: 'error',
+            message: String(err),
+          }),
+        )
+      }
     } finally {
+      if (abortRef.current === ac) abortRef.current = null
       setStreaming(false)
+      setPendingConfirm(false)
     }
-  }
+  }, [input, messages, streaming, saveSession])
+
+  const statusLabel = deriveChatStatus(messages, streaming, { pendingConfirm })
 
   return (
-    <div className="flex h-full">
+    <div className="chat-panel">
       <div
-        className={`${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-200 border-r border-zinc-800 bg-zinc-900/50 flex flex-col shrink-0 overflow-hidden`}
+        className={`chat-panel__sidebar${sidebarOpen ? ' chat-panel__sidebar--open' : ' chat-panel__sidebar--closed'}`}
       >
-        <div className="p-3 border-b border-zinc-800">
+        <div className="chat-panel__sidebar-header">
           <button
             type="button"
             onClick={newChat}
-            className="w-full px-3 py-2 bg-orange-600 hover:bg-orange-500 text-white text-sm rounded-lg transition-colors"
+            className="chat-panel__new-chat-btn"
           >
             + New Chat
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="chat-panel__session-list">
           {sessions.map(s => (
             <div
               key={s.id}
               onClick={() => openSession(s.id)}
-              className={`group flex items-center gap-2 px-3 py-2 cursor-pointer text-sm ${
-                activeId === s.id
-                  ? 'bg-zinc-800 text-white'
-                  : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
-              }`}
+              className={`chat-panel__session-item${activeId === s.id ? ' chat-panel__session-item--active' : ''}`}
             >
-              <span className="flex-1 truncate">{s.title}</span>
+              <span className="chat-panel__session-title">{s.title}</span>
               <button
                 type="button"
                 onClick={e => {
                   e.stopPropagation()
                   void deleteSession(s.id)
                 }}
-                className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 text-xs"
+                className="chat-panel__session-delete"
               >
                 ✕
               </button>
             </div>
           ))}
           {sessions.length === 0 && (
-            <p className="text-zinc-600 text-xs text-center py-8">
+            <p className="chat-panel__session-empty">
               No conversations yet
             </p>
           )}
@@ -283,24 +331,24 @@ export default function ChatPanel(): ReactElement {
       <button
         type="button"
         onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="text-zinc-500 hover:text-zinc-300 px-1 text-xs shrink-0"
+        className="chat-panel__sidebar-toggle"
       >
         {sidebarOpen ? '◀' : '▶'}
       </button>
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">
+      <div className="chat-panel__main">
+        <div ref={scrollRef} className="chat-panel__messages">
           {messages.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-zinc-500">
+            <div className="chat-panel__messages--empty">
               <div className="text-center">
-                <p className="text-lg mb-2">Chat</p>
-                <p className="text-sm">
+                <p className="chat-panel__empty-title">Chat</p>
+                <p className="chat-panel__empty-subtitle">
                   Start a new conversation or select one from the sidebar.
                 </p>
               </div>
             </div>
           ) : (
-            <div className="space-y-4 max-w-3xl mx-auto">
+            <div className="chat-panel__message-list">
               {messages.map(msg => (
                 <MessageBubble key={msg.id} message={msg} />
               ))}
@@ -309,12 +357,18 @@ export default function ChatPanel(): ReactElement {
         </div>
 
         {memToast && (
-          <div className="px-4 py-1.5 text-xs text-orange-300 bg-orange-500/10 text-center">
+          <div className="chat-panel__memory-toast">
             {memToast}
           </div>
         )}
-        <div className="border-t border-zinc-800 p-4 shrink-0">
-          <div className="flex gap-2 max-w-3xl mx-auto">
+        {statusLabel && (
+          <div className="chat-panel__status">
+            <span className="chat-panel__status-dot" />
+            <span className="chat-panel__status-text">{statusLabel}</span>
+          </div>
+        )}
+        <div className="chat-panel__input-area">
+          <div className="chat-panel__input-row">
             <input
               type="text"
               value={input}
@@ -324,18 +378,28 @@ export default function ChatPanel(): ReactElement {
               onKeyDown={e => {
                 if (e.key === 'Enter' && !composing && !streaming) void handleSend()
               }}
-              placeholder={streaming ? 'Waiting...' : 'Type a message...'}
+              placeholder={streaming ? statusLabel ?? 'Working…' : 'Type a message...'}
               disabled={streaming}
-              className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-orange-500/50 disabled:opacity-50"
+              className="chat-panel__input"
             />
-            <button
-              type="button"
-              onClick={() => void handleSend()}
-              disabled={!input.trim() || streaming}
-              className="px-4 py-2 bg-orange-600 hover:bg-orange-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white text-sm rounded-lg transition-colors"
-            >
-              {streaming ? '...' : 'Send'}
-            </button>
+            {streaming ? (
+              <button
+                type="button"
+                onClick={handleStop}
+                className="chat-panel__stop-btn"
+              >
+                Stop
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void handleSend()}
+                disabled={!input.trim()}
+                className="chat-panel__send-btn"
+              >
+                Send
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -346,20 +410,20 @@ export default function ChatPanel(): ReactElement {
 function MessageBubble({ message }: { message: ChatMessage }): ReactElement {
   const isUser = message.role === 'user'
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+    <div className={`message${isUser ? ' message--user' : ' message--assistant'}`}>
       <div
-        className={`max-w-[80%] rounded-lg px-4 py-2 text-sm ${isUser ? 'bg-orange-600/20 text-orange-100' : 'bg-zinc-800 text-zinc-200'}`}
+        className={`message__bubble${isUser ? ' message__bubble--user' : ' message__bubble--assistant'}`}
       >
-        <p className="whitespace-pre-wrap">{message.content || ' '}</p>
+        <p className="message__content">{message.content || ' '}</p>
         {message.toolCalls && message.toolCalls.length > 0 && (
-          <div className="mt-2 space-y-1">
+          <div className="message__tool-calls">
             {message.toolCalls.map(tc => (
               <ToolCallCard key={tc.id} toolCall={tc} />
             ))}
           </div>
         )}
         {message.status === 'streaming' && (
-          <span className="inline-block w-2 h-4 bg-orange-400 animate-pulse ml-1" />
+          <span className="message__streaming-cursor" />
         )}
       </div>
     </div>
@@ -367,18 +431,16 @@ function MessageBubble({ message }: { message: ChatMessage }): ReactElement {
 }
 
 function ToolCallCard({ toolCall }: { toolCall: ToolCallEvent }): ReactElement {
-  const colors = {
-    pending: 'text-zinc-400',
-    running: 'text-blue-400',
-    complete: 'text-green-400',
-    error: 'text-red-400',
-  }
   return (
-    <div className="text-xs bg-zinc-900/50 rounded px-2 py-1 border border-zinc-700/50">
-      <span className={colors[toolCall.status]}>[{toolCall.status}]</span>{' '}
-      <span className="text-zinc-300 font-medium">{toolCall.toolName}</span>
+    <div className="tool-call">
+      <span className="tool-call__status" data-status={toolCall.status}>
+        [{toolCall.status}]
+      </span>{' '}
+      <span className="tool-call__name">{toolCall.toolName}</span>
       {toolCall.output && (
-        <pre className="mt-1 text-zinc-500 truncate max-w-xs">{toolCall.output}</pre>
+        <pre className="tool-call__output">
+          {toolCall.output}
+        </pre>
       )}
     </div>
   )

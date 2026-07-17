@@ -1,27 +1,33 @@
 import type { ReactElement } from 'react'
+import HeadlessSettings from './HeadlessSettings'
 import LLMSettings from './LLMSettings'
 import MemorySettings from './MemorySettings'
 import OnionEditor from './OnionEditor'
 
 export default function SettingsPanel(): ReactElement {
   return (
-    <div className="max-w-2xl mx-auto p-6 overflow-y-auto h-full">
-      <h2 className="text-lg font-semibold mb-6">Settings</h2>
+    <div className="settings">
+      <h2 className="settings__title">Settings</h2>
 
-      <section className="mb-8">
-        <h3 className="text-sm font-medium text-zinc-400 mb-3">
+      <section className="settings__section">
+        <h3 className="settings__section-title">
           LLM Configuration
         </h3>
         <LLMSettings />
       </section>
 
-      <section className="mb-8">
-        <h3 className="text-sm font-medium text-zinc-400 mb-3">Memory</h3>
+      <section className="settings__section">
+        <h3 className="settings__section-title">Agent</h3>
+        <HeadlessSettings />
+      </section>
+
+      <section className="settings__section">
+        <h3 className="settings__section-title">Memory</h3>
         <MemorySettings />
       </section>
 
-      <section>
-        <h3 className="text-sm font-medium text-zinc-400 mb-3">Contract Onion</h3>
+      <section className="settings__section">
+        <h3 className="settings__section-title">Contract Onion</h3>
         <OnionEditor />
       </section>
     </div>

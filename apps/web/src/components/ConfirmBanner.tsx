@@ -1,3 +1,4 @@
+import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
 import { useEffect, useState, type ReactElement } from 'react'
 
 interface PendingItem {
@@ -17,11 +18,12 @@ function parsePendingPayload(data: unknown): PendingItem[] {
   return []
 }
 
+/** Blocking confirm dialog for onion `needs_confirm` (Headless UI). */
 export default function ConfirmBanner(): ReactElement | null {
   const [pending, setPending] = useState<PendingItem[]>([])
   const [submitting, setSubmitting] = useState<string | null>(null)
 
-  useEffect(() => {
+  useEffect(function syncPendingStream() {
     let closed = false
     let es: EventSource | null = null
     let pollTimer: ReturnType<typeof setInterval> | undefined
@@ -42,7 +44,7 @@ export default function ConfirmBanner(): ReactElement | null {
     const startPolling = () => {
       if (pollTimer) return
       void poll()
-      pollTimer = setInterval(poll, 3000)
+      pollTimer = setInterval(poll, 1500)
     }
 
     const stopPolling = () => {
@@ -71,6 +73,9 @@ export default function ConfirmBanner(): ReactElement | null {
       startPolling()
     }
 
+    // Always poll as a fallback — SSE can silently stall behind proxies.
+    startPolling()
+
     return () => {
       closed = true
       es?.close()
@@ -86,35 +91,53 @@ export default function ConfirmBanner(): ReactElement | null {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId, decision }),
       })
+      setPending(prev => prev.filter(p => p.requestId !== requestId))
     } finally {
       setSubmitting(null)
     }
   }
 
   const first = pending[0]
-  if (!first) return null
+  const open = Boolean(first)
 
   return (
-    <div className="flex items-center gap-2 ml-auto px-3 py-1.5 bg-amber-950/50 border border-amber-700/50 rounded-lg text-sm max-w-lg">
-      <span className="text-amber-200 truncate flex-1" title={first.message}>
-        {first.message}
-      </span>
-      <button
-        type="button"
-        onClick={() => confirm(first.requestId, 'allow')}
-        disabled={submitting === first.requestId}
-        className="px-2 py-1 bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white rounded text-xs shrink-0"
-      >
-        Allow
-      </button>
-      <button
-        type="button"
-        onClick={() => confirm(first.requestId, 'deny')}
-        disabled={submitting === first.requestId}
-        className="px-2 py-1 bg-red-700 hover:bg-red-600 disabled:opacity-50 text-white rounded text-xs shrink-0"
-      >
-        Deny
-      </button>
-    </div>
+    <Dialog open={open} onClose={() => {}} className="relative" style={{ zIndex: 'var(--z-modal)' }}>
+      <div className="confirm-dialog__overlay" aria-hidden="true" />
+      <div className="confirm-dialog__wrapper">
+        <DialogPanel className="confirm-dialog__panel">
+          <DialogTitle className="confirm-dialog__title">
+            Tool confirmation required
+          </DialogTitle>
+          {first && (
+            <>
+              <p className="confirm-dialog__message">
+                {first.message}
+              </p>
+              <p className="confirm-dialog__tool-name">
+                {first.toolName}
+              </p>
+              <div className="confirm-dialog__actions">
+                <button
+                  type="button"
+                  onClick={() => void confirm(first.requestId, 'deny')}
+                  disabled={submitting === first.requestId}
+                  className="confirm-dialog__btn--deny"
+                >
+                  Deny
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void confirm(first.requestId, 'allow')}
+                  disabled={submitting === first.requestId}
+                  className="confirm-dialog__btn--allow"
+                >
+                  Allow
+                </button>
+              </div>
+            </>
+          )}
+        </DialogPanel>
+      </div>
+    </Dialog>
   )
 }

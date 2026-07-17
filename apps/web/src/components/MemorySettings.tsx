@@ -1,36 +1,25 @@
 import { useEffect, useState, type ReactElement } from 'react'
-
-interface MemoryConfig {
-  provider: string
-  maxEntries: number
-  autoRecall: boolean
-}
-
-interface MemoryEntry {
-  id?: string
-  type?: string
-  content?: string
-}
-
-const DEFAULT: MemoryConfig = {
-  provider: 'ccb',
-  maxEntries: 200,
-  autoRecall: true,
-}
+import {
+  toMemoryConfig,
+  toMemoryEntryList,
+  MEMORY_CONFIG_DEFAULT,
+  type MemoryConfigDTO,
+  type MemoryEntryDTO,
+} from '../mappers/memory'
 
 export default function MemorySettings(): ReactElement {
-  const [config, setConfig] = useState<MemoryConfig | null>(null)
-  const [entries, setEntries] = useState<MemoryEntry[]>([])
+  const [config, setConfig] = useState<MemoryConfigDTO | null>(null)
+  const [entries, setEntries] = useState<MemoryEntryDTO[]>([])
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
+  useEffect(function loadMemoryConfig() {
     fetch('/api/memory')
       .then(r => r.json())
-      .then(data => setConfig(data.config ?? DEFAULT))
-      .catch(() => setConfig(DEFAULT))
+      .then(data => setConfig(data.config ? toMemoryConfig(data.config) : MEMORY_CONFIG_DEFAULT))
+      .catch(() => setConfig(MEMORY_CONFIG_DEFAULT))
     fetch('/api/memory/entries')
       .then(r => r.json())
-      .then(data => setEntries(data.entries ?? []))
+      .then(data => setEntries(toMemoryEntryList(data.entries)))
       .catch(() => {})
   }, [])
 
@@ -48,16 +37,16 @@ export default function MemorySettings(): ReactElement {
     }
   }
 
-  if (!config) return <p className="text-zinc-500 text-sm">Loading...</p>
+  if (!config) return <p className="form-field__loading">Loading...</p>
 
   return (
-    <div className="space-y-4">
+    <div className="form-field">
       <div>
-        <label className="block text-xs text-zinc-400 mb-1">Memory Provider</label>
+        <label className="form-field__label">Memory Provider</label>
         <select
           value={config.provider}
           onChange={e => setConfig({ ...config, provider: e.target.value })}
-          className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-orange-500/50"
+          className="form-field__select"
         >
           <option value="ccb">CCB (memdir)</option>
           <option value="json">JSON File (.harness/memory/)</option>
@@ -66,45 +55,45 @@ export default function MemorySettings(): ReactElement {
       </div>
 
       <div>
-        <label className="block text-xs text-zinc-400 mb-1">Max Entries</label>
+        <label className="form-field__label">Max Entries</label>
         <input
           type="number"
           value={config.maxEntries}
           onChange={e =>
             setConfig({ ...config, maxEntries: Number(e.target.value) })
           }
-          className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-orange-500/50"
+          className="form-field__input"
         />
       </div>
 
-      <div className="flex items-center gap-3">
-        <label className="text-xs text-zinc-400">Auto-recall in Chat</label>
+      <div className="inline-toggle">
+        <label className="inline-toggle__label">Auto-recall in Chat</label>
         <button
           type="button"
           onClick={() => setConfig({ ...config, autoRecall: !config.autoRecall })}
-          className={`w-9 h-5 rounded-full transition-colors relative ${config.autoRecall ? 'bg-orange-500' : 'bg-zinc-600'}`}
+          className={`toggle${config.autoRecall ? ' toggle--on' : ' toggle--off'}`}
         >
           <span
-            className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${config.autoRecall ? 'left-4' : 'left-0.5'}`}
+            className={`toggle__knob${config.autoRecall ? ' toggle__knob--on' : ' toggle__knob--off'}`}
           />
         </button>
       </div>
 
       <div>
-        <label className="block text-xs text-zinc-400 mb-1">
+        <label className="form-field__label">
           Stored Memories ({entries.length})
         </label>
-        <div className="max-h-48 overflow-y-auto space-y-1">
+        <div className="memory-settings__entries">
           {entries.length === 0 && (
-            <p className="text-zinc-600 text-xs">No memories stored yet</p>
+            <p className="memory-settings__entries-empty">No memories stored yet</p>
           )}
           {entries.map((e, i) => (
             <div
               key={e.id ?? i}
-              className="text-xs bg-zinc-800 rounded px-2 py-1.5 border border-zinc-700/50"
+              className="memory-settings__entry"
             >
-              <span className="text-zinc-500 mr-1">[{e.type}]</span>
-              <span className="text-zinc-300">{e.content?.slice(0, 100)}</span>
+              <span className="memory-settings__entry-type">[{e.type}]</span>
+              <span className="memory-settings__entry-content">{e.content?.slice(0, 100)}</span>
             </div>
           ))}
         </div>
@@ -114,7 +103,7 @@ export default function MemorySettings(): ReactElement {
         type="button"
         onClick={() => void save()}
         disabled={saving}
-        className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-sm rounded-lg transition-colors"
+        className="form-field__save-btn"
       >
         {saving ? 'Saving...' : 'Save'}
       </button>

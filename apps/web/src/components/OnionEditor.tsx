@@ -1,16 +1,17 @@
 import { useEffect, useState, type ReactElement } from 'react'
 import type { OnionLayerConfig } from '../types/onion'
+import { toOnionLayerList } from '../mappers/onion'
 
 export default function OnionEditor(): ReactElement {
   const [layers, setLayers] = useState<OnionLayerConfig[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
+  useEffect(function loadOnionLayers() {
     fetch('/api/onion')
       .then(r => r.json())
       .then(data => {
-        setLayers(data.layers ?? [])
+        setLayers(toOnionLayerList(data.layers))
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -60,43 +61,35 @@ export default function OnionEditor(): ReactElement {
   }
 
   if (loading) {
-    return <p className="text-zinc-500 text-sm">Loading...</p>
+    return <p className="form-field__loading">Loading...</p>
   }
 
   return (
-    <div className="space-y-2">
+    <div className="onion-editor">
       {layers.length === 0 && (
-        <p className="text-red-400 text-sm">
+        <p className="onion-editor__empty">
           No active layers — all privileged calls will be denied.
         </p>
       )}
       {layers.map((layer, idx) => (
         <div
           key={layer.id}
-          className={`flex items-center gap-3 p-3 rounded-lg border ${
-            layer.enabled
-              ? 'border-zinc-700 bg-zinc-800/50'
-              : 'border-zinc-800 bg-zinc-900/30 opacity-60'
-          }`}
+          className={`onion-editor__layer${layer.enabled ? ' onion-editor__layer--enabled' : ' onion-editor__layer--disabled'}`}
         >
           <button
             type="button"
             onClick={() => void toggleLayer(layer.id)}
-            className={`w-9 h-5 rounded-full transition-colors relative ${
-              layer.enabled ? 'bg-orange-500' : 'bg-zinc-600'
-            }`}
+            className={`toggle${layer.enabled ? ' toggle--on' : ' toggle--off'}`}
             aria-label={layer.enabled ? 'Disable layer' : 'Enable layer'}
           >
             <span
-              className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-                layer.enabled ? 'left-4' : 'left-0.5'
-              }`}
+              className={`toggle__knob${layer.enabled ? ' toggle__knob--on' : ' toggle__knob--off'}`}
             />
           </button>
 
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{layer.name}</p>
-            <p className="text-xs text-zinc-500">
+          <div className="onion-editor__layer-info">
+            <p className="onion-editor__layer-name">{layer.name}</p>
+            <p className="onion-editor__layer-meta">
               {layer.type} · priority {layer.priority}
             </p>
           </div>
@@ -105,7 +98,7 @@ export default function OnionEditor(): ReactElement {
             type="button"
             onClick={() => void moveLayer(layer.id, 'up')}
             disabled={idx === 0}
-            className="text-zinc-500 hover:text-zinc-300 disabled:opacity-30 text-sm px-1"
+            className="onion-editor__move-btn"
             aria-label="Move up"
           >
             ▲
@@ -114,7 +107,7 @@ export default function OnionEditor(): ReactElement {
             type="button"
             onClick={() => void moveLayer(layer.id, 'down')}
             disabled={idx === layers.length - 1}
-            className="text-zinc-500 hover:text-zinc-300 disabled:opacity-30 text-sm px-1"
+            className="onion-editor__move-btn"
             aria-label="Move down"
           >
             ▼
@@ -124,7 +117,7 @@ export default function OnionEditor(): ReactElement {
             type="button"
             onClick={() => void deleteLayer(layer.id)}
             disabled={layer.type === 'audit'}
-            className="text-zinc-500 hover:text-red-400 disabled:opacity-30 text-sm"
+            className="onion-editor__delete-btn"
             aria-label="Delete layer"
           >
             ✕
@@ -132,7 +125,7 @@ export default function OnionEditor(): ReactElement {
         </div>
       ))}
 
-      {saving && <p className="text-xs text-zinc-500">Saving...</p>}
+      {saving && <p className="onion-editor__saving">Saving...</p>}
     </div>
   )
 }

@@ -1,1 +1,485 @@
 @import "tailwindcss";
+
+/* ============================================================
+   Z-Index Scale — named variables, never raw numbers
+   ============================================================ */
+:root {
+  --z-base: auto;
+  --z-sticky: 10;
+  --z-dropdown: 100;
+  --z-nav: 200;
+  --z-mask: 500;
+  --z-modal: 600;
+  --z-tooltip: 700;
+  --z-toast: 800;
+  --z-loading: 900;
+  --z-max: 99999;
+}
+
+/* ============================================================
+   Shell — app chrome (App.tsx)
+   ============================================================ */
+.shell {
+  @apply flex flex-col h-full;
+}
+
+.shell__header {
+  @apply flex items-center gap-1 px-4 py-2 border-b border-zinc-800 bg-zinc-900 shrink-0;
+}
+
+.shell__brand {
+  @apply text-sm font-semibold text-orange-400 mr-4;
+}
+
+.shell__nav {
+  @apply flex gap-1;
+}
+
+.shell__tab {
+  @apply px-3 py-1.5 text-sm rounded-md transition-colors text-zinc-400;
+
+  &:hover {
+    @apply text-zinc-200 bg-zinc-800/50;
+  }
+}
+
+.shell__tab--active {
+  @apply bg-zinc-800 text-white;
+}
+
+.shell__main {
+  @apply flex-1 overflow-hidden;
+}
+
+/* ============================================================
+   Chat Panel
+   ============================================================ */
+.chat-panel {
+  @apply flex h-full;
+}
+
+/* -- Sidebar -- */
+.chat-panel__sidebar {
+  @apply border-r border-zinc-800 bg-zinc-900/50 flex flex-col shrink-0 overflow-hidden transition-all duration-200;
+}
+
+.chat-panel__sidebar--open {
+  width: 256px;
+}
+
+.chat-panel__sidebar--closed {
+  width: 0;
+}
+
+.chat-panel__sidebar-header {
+  @apply p-3 border-b border-zinc-800;
+}
+
+.chat-panel__new-chat-btn {
+  @apply w-full px-3 py-2 bg-orange-600 hover:bg-orange-500 text-white text-sm rounded-lg transition-colors;
+}
+
+.chat-panel__session-list {
+  @apply flex-1 overflow-y-auto;
+}
+
+.chat-panel__session-item {
+  @apply flex items-center gap-2 px-3 py-2 cursor-pointer text-sm text-zinc-400;
+
+  &:hover {
+    @apply bg-zinc-800/50 text-zinc-200;
+  }
+}
+
+.chat-panel__session-item--active {
+  @apply bg-zinc-800 text-white;
+}
+
+.chat-panel__session-title {
+  @apply flex-1 truncate;
+}
+
+.chat-panel__session-delete {
+  @apply opacity-0 text-zinc-500 hover:text-red-400 text-xs;
+}
+
+/* Reveal delete button on session item hover */
+.chat-panel__session-item:hover .chat-panel__session-delete {
+  @apply opacity-100;
+}
+
+.chat-panel__session-empty {
+  @apply text-zinc-600 text-xs text-center py-8;
+}
+
+/* -- Sidebar toggle -- */
+.chat-panel__sidebar-toggle {
+  @apply text-zinc-500 hover:text-zinc-300 px-1 text-xs shrink-0;
+}
+
+/* -- Main chat area -- */
+.chat-panel__main {
+  @apply flex-1 flex flex-col min-w-0;
+}
+
+.chat-panel__messages {
+  @apply flex-1 overflow-y-auto p-4;
+}
+
+.chat-panel__messages--empty {
+  @apply flex items-center justify-center h-full text-zinc-500;
+}
+
+.chat-panel__empty-title {
+  @apply text-lg mb-2;
+}
+
+.chat-panel__empty-subtitle {
+  @apply text-sm;
+}
+
+.chat-panel__message-list {
+  @apply space-y-4 max-w-3xl mx-auto;
+}
+
+/* -- Memory toast -- */
+.chat-panel__memory-toast {
+  @apply px-4 py-1.5 text-xs text-orange-300 bg-orange-500/10 text-center;
+}
+
+/* -- Status bar -- */
+.chat-panel__status {
+  @apply px-4 py-1.5 text-xs text-zinc-400 bg-zinc-900/80 border-t border-zinc-800/80 flex items-center gap-2 max-w-3xl mx-auto w-full;
+}
+
+.chat-panel__status-dot {
+  @apply inline-block w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse shrink-0;
+}
+
+.chat-panel__status-text {
+  @apply truncate;
+}
+
+/* -- Input area -- */
+.chat-panel__input-area {
+  @apply border-t border-zinc-800 p-4 shrink-0;
+}
+
+.chat-panel__input-row {
+  @apply flex gap-2 max-w-3xl mx-auto;
+}
+
+.chat-panel__input {
+  @apply flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-500;
+
+  &:focus {
+    @apply outline-none border-orange-500/50;
+  }
+
+  &:disabled {
+    @apply opacity-50;
+  }
+}
+
+.chat-panel__send-btn {
+  @apply px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-sm rounded-lg transition-colors;
+
+  &:disabled {
+    @apply bg-zinc-700 text-zinc-500;
+  }
+}
+
+.chat-panel__stop-btn {
+  @apply px-4 py-2 bg-zinc-700 hover:bg-red-700 text-white text-sm rounded-lg transition-colors;
+}
+
+/* ============================================================
+   Message Bubble
+   ============================================================ */
+.message {
+  @apply flex;
+}
+
+.message--user {
+  @apply justify-end;
+}
+
+.message--assistant {
+  @apply justify-start;
+}
+
+.message__bubble {
+  @apply max-w-[80%] rounded-lg px-4 py-2 text-sm;
+}
+
+.message__bubble--user {
+  @apply bg-orange-600/20 text-orange-100;
+}
+
+.message__bubble--assistant {
+  @apply bg-zinc-800 text-zinc-200;
+}
+
+.message__content {
+  @apply whitespace-pre-wrap;
+}
+
+.message__streaming-cursor {
+  @apply inline-block w-2 h-4 bg-orange-400 animate-pulse ml-1;
+}
+
+/* -- Tool call card -- */
+.message__tool-calls {
+  @apply mt-2 space-y-1;
+}
+
+.tool-call {
+  @apply text-xs bg-zinc-900/50 rounded px-2 py-1.5 border border-zinc-700/50;
+}
+
+.tool-call__status {
+  &[data-status="pending"]  { @apply text-zinc-400; }
+  &[data-status="running"]  { @apply text-blue-400; }
+  &[data-status="complete"] { @apply text-green-400; }
+  &[data-status="error"]    { @apply text-red-400; }
+}
+
+.tool-call__name {
+  @apply text-zinc-300 font-medium;
+}
+
+.tool-call__output {
+  @apply mt-1.5 text-zinc-400 whitespace-pre-wrap break-words max-h-48 overflow-y-auto;
+}
+
+/* ============================================================
+   Settings Panel
+   ============================================================ */
+.settings {
+  @apply max-w-2xl mx-auto p-6 overflow-y-auto h-full;
+}
+
+.settings__title {
+  @apply text-lg font-semibold mb-6;
+}
+
+.settings__section {
+  @apply mb-8;
+}
+
+.settings__section-title {
+  @apply text-sm font-medium text-zinc-400 mb-3;
+}
+
+/* -- Form shared -- */
+.form-field {
+  @apply space-y-4;
+}
+
+.form-field__label {
+  @apply block text-xs text-zinc-400 mb-1;
+}
+
+.form-field__input {
+  @apply w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100;
+
+  &:focus {
+    @apply outline-none border-orange-500/50;
+  }
+
+  &::placeholder {
+    @apply text-zinc-500;
+  }
+}
+
+.form-field__select {
+  @apply w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100;
+
+  &:focus {
+    @apply outline-none border-orange-500/50;
+  }
+}
+
+.form-field__save-btn {
+  @apply px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-sm rounded-lg transition-colors;
+
+  &:disabled {
+    @apply opacity-50;
+  }
+}
+
+.form-field__save-btn--saved {
+  @apply bg-green-600 text-white;
+}
+
+.form-field__loading {
+  @apply text-zinc-500 text-sm;
+}
+
+/* -- Toggle switch -- */
+.toggle {
+  @apply w-9 h-5 rounded-full transition-colors relative shrink-0;
+}
+
+.toggle--on {
+  @apply bg-orange-500;
+}
+
+.toggle--off {
+  @apply bg-zinc-600;
+}
+
+.toggle__knob {
+  @apply absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform;
+}
+
+.toggle__knob--on {
+  left: 16px;
+}
+
+.toggle__knob--off {
+  left: 2px;
+}
+
+/* -- Toggle setting row -- */
+.toggle-setting {
+  @apply flex items-start gap-3 p-3 rounded-lg border border-zinc-700 bg-zinc-800/50;
+}
+
+.toggle-setting__info {
+  @apply min-w-0;
+}
+
+.toggle-setting__label {
+  @apply text-sm font-medium text-zinc-100;
+}
+
+.toggle-setting__desc {
+  @apply text-xs text-zinc-500 mt-1;
+}
+
+/* -- Inline toggle -- */
+.inline-toggle {
+  @apply flex items-center gap-3;
+}
+
+.inline-toggle__label {
+  @apply text-xs text-zinc-400;
+}
+
+/* ============================================================
+   Onion Editor
+   ============================================================ */
+.onion-editor {
+  @apply space-y-2;
+}
+
+.onion-editor__empty {
+  @apply text-red-400 text-sm;
+}
+
+.onion-editor__layer {
+  @apply flex items-center gap-3 p-3 rounded-lg border;
+}
+
+.onion-editor__layer--enabled {
+  @apply border-zinc-700 bg-zinc-800/50;
+}
+
+.onion-editor__layer--disabled {
+  @apply border-zinc-800 bg-zinc-900/30 opacity-60;
+}
+
+.onion-editor__layer-info {
+  @apply flex-1 min-w-0;
+}
+
+.onion-editor__layer-name {
+  @apply text-sm font-medium truncate;
+}
+
+.onion-editor__layer-meta {
+  @apply text-xs text-zinc-500;
+}
+
+.onion-editor__move-btn {
+  @apply text-zinc-500 hover:text-zinc-300 text-sm px-1;
+
+  &:disabled {
+    @apply opacity-30;
+  }
+}
+
+.onion-editor__delete-btn {
+  @apply text-zinc-500 hover:text-red-400 text-sm;
+
+  &:disabled {
+    @apply opacity-30;
+  }
+}
+
+.onion-editor__saving {
+  @apply text-xs text-zinc-500;
+}
+
+/* ============================================================
+   Memory Settings
+   ============================================================ */
+.memory-settings__entries {
+  @apply max-h-48 overflow-y-auto space-y-1;
+}
+
+.memory-settings__entries-empty {
+  @apply text-zinc-600 text-xs;
+}
+
+.memory-settings__entry {
+  @apply text-xs bg-zinc-800 rounded px-2 py-1.5 border border-zinc-700/50;
+}
+
+.memory-settings__entry-type {
+  @apply text-zinc-500 mr-1;
+}
+
+.memory-settings__entry-content {
+  @apply text-zinc-300;
+}
+
+/* ============================================================
+   Confirm Dialog (ConfirmBanner.tsx)
+   ============================================================ */
+.confirm-dialog__overlay {
+  @apply fixed inset-0 bg-black/60;
+}
+
+.confirm-dialog__wrapper {
+  @apply fixed inset-0 flex items-center justify-center p-4;
+}
+
+.confirm-dialog__panel {
+  @apply w-full max-w-md rounded-xl border border-amber-700/50 bg-zinc-900 p-5 shadow-xl;
+}
+
+.confirm-dialog__title {
+  @apply text-base font-semibold text-amber-200;
+}
+
+.confirm-dialog__message {
+  @apply mt-2 text-sm text-zinc-300 whitespace-pre-wrap;
+}
+
+.confirm-dialog__tool-name {
+  @apply mt-2 text-xs text-zinc-500 font-mono truncate;
+}
+
+.confirm-dialog__actions {
+  @apply mt-4 flex justify-end gap-2;
+}
+
+.confirm-dialog__btn--deny {
+  @apply px-3 py-1.5 bg-red-800 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg text-sm;
+}
+
+.confirm-dialog__btn--allow {
+  @apply px-3 py-1.5 bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white rounded-lg text-sm;
+}

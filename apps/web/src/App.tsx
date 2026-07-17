@@ -1,7 +1,8 @@
-import { useState, type ReactElement, type ReactNode } from 'react'
+import { Component, useState, type ReactElement, type ReactNode } from 'react'
 import ChatPanel from './components/ChatPanel'
 import ConfirmBanner from './components/ConfirmBanner'
 import SettingsPanel from './components/SettingsPanel'
+import { captureComponentError } from './monitoring/error-reporting'
 
 type Tab = 'chat' | 'settings'
 
@@ -9,31 +10,72 @@ export default function App(): ReactElement {
   const [activeTab, setActiveTab] = useState<Tab>('chat')
 
   return (
-    <div className="flex flex-col h-full">
-      <header className="flex items-center gap-1 px-4 py-2 border-b border-zinc-800 bg-zinc-900 shrink-0">
-        <span className="text-sm font-semibold text-orange-400 mr-4">Harness</span>
-        <nav className="flex gap-1">
-          <TabButton
-            active={activeTab === 'chat'}
-            onClick={() => setActiveTab('chat')}
-          >
-            Chat
-          </TabButton>
-          <TabButton
-            active={activeTab === 'settings'}
-            onClick={() => setActiveTab('settings')}
-          >
-            Settings
-          </TabButton>
-        </nav>
-        <ConfirmBanner />
-      </header>
+    <ErrorBoundary>
+      <div className="shell">
+        <header className="shell__header">
+          <span className="shell__brand">Harness</span>
+          <nav className="shell__nav">
+            <TabButton
+              active={activeTab === 'chat'}
+              onClick={() => setActiveTab('chat')}
+            >
+              Chat
+            </TabButton>
+            <TabButton
+              active={activeTab === 'settings'}
+              onClick={() => setActiveTab('settings')}
+            >
+              Settings
+            </TabButton>
+          </nav>
+        </header>
 
-      <main className="flex-1 overflow-hidden">
-        {activeTab === 'chat' ? <ChatPanel /> : <SettingsPanel />}
-      </main>
-    </div>
+        <main className="shell__main">
+          {activeTab === 'chat' ? <ChatPanel /> : <SettingsPanel />}
+        </main>
+        <ConfirmBanner />
+      </div>
+    </ErrorBoundary>
   )
+}
+
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo): void {
+    captureComponentError(error, {
+      componentStack: info.componentStack ?? '',
+    })
+  }
+
+  render(): ReactNode {
+    if (this.state.hasError) {
+      return (
+        <div className="shell">
+          <header className="shell__header">
+            <span className="shell__brand">Harness</span>
+          </header>
+          <main className="shell__main flex items-center justify-center">
+            <div className="text-center text-zinc-400">
+              <p className="text-lg mb-2">Something went wrong</p>
+              <p className="text-sm">Reload the page to try again.</p>
+            </div>
+          </main>
+        </div>
+      )
+    }
+    return this.props.children
+  }
 }
 
 function TabButton({
@@ -49,11 +91,7 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-        active
-          ? 'bg-zinc-800 text-white'
-          : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
-      }`}
+      className={`shell__tab${active ? ' shell__tab--active' : ''}`}
     >
       {children}
     </button>
