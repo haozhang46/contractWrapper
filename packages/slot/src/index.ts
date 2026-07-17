@@ -4,3 +4,4 @@ export type {
   SlotSessionConfig,
   ToolCallEvent,
 } from './types.ts'
+export { createMockSlot } from './mock-slot.ts'

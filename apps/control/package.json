@@ -5,6 +5,7 @@
   "dependencies": {
     "@harness/onion": "workspace:*",
     "@harness/protocol": "workspace:*",
+    "@harness/slot": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.12.0",
     "hono": "^4.12.0"
   },
