@@ -28,5 +28,10 @@ export interface AgentSlot {
     onEvent: (event: SlotEvent) => void,
     signal?: AbortSignal,
   ): Promise<void>
-  abort(): void
+  /**
+   * Abort the in-flight turn.
+   * When `signal` is provided, only abort if that signal owns the current turn
+   * (queued-request disconnect must not kill a different in-flight turn).
+   */
+  abort(signal?: AbortSignal): void
 }

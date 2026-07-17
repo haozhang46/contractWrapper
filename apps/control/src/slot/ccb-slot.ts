@@ -65,8 +65,11 @@ export class CcbSlot implements AgentSlot {
   private session: SlotSessionConfig | null = null
   private child: ReturnType<typeof Bun.spawn> | null = null
   private stdoutBuffer = ''
+  // Serial turn queue. Turn timeout (abort + error after N ms) is deferred —
+  // out of this slice; callers may still abort via AbortSignal / abort().
   private turnChain: Promise<void> = Promise.resolve()
   private currentTurnId: string | null = null
+  private currentTurnSignal: AbortSignal | null = null
   private turnAbort: AbortController | null = null
   private readonly waiters = new Map<
     string,
@@ -89,7 +92,11 @@ export class CcbSlot implements AgentSlot {
     return this.session
   }
 
-  abort(): void {
+  abort(signal?: AbortSignal): void {
+    // Scoped abort: ignore disconnects that belong to a queued (non-current) turn.
+    if (signal !== undefined && this.currentTurnSignal !== signal) {
+      return
+    }
     const id = this.currentTurnId
     if (id && this.child?.stdin) {
       try {
@@ -124,7 +131,15 @@ export class CcbSlot implements AgentSlot {
     onEvent: (event: SlotEvent) => void,
     signal?: AbortSignal,
   ): Promise<void> {
-    const run = () => this.runTurn(messages, onEvent, signal)
+    // Short-circuit queued turns whose client already disconnected — do not
+    // touch the in-flight turn (currentTurnId / turnAbort).
+    const run = async () => {
+      if (signal?.aborted) {
+        this.emitAborted(onEvent)
+        return
+      }
+      await this.runTurn(messages, onEvent, signal)
+    }
     const next = this.turnChain.then(run, run)
     this.turnChain = next.then(
       () => undefined,
@@ -137,6 +152,13 @@ export class CcbSlot implements AgentSlot {
     onEvent({ type: 'error', message: 'Agent Slot / CCB 不可用: aborted' })
   }
 
+  private clearCurrentTurn(id: string): void {
+    if (this.currentTurnId === id) {
+      this.currentTurnId = null
+      this.currentTurnSignal = null
+    }
+  }
+
   private async runTurn(
     messages: Array<{ role: string; content: string }>,
     onEvent: (event: SlotEvent) => void,
@@ -146,14 +168,15 @@ export class CcbSlot implements AgentSlot {
       this.session?.workspaceRoot ?? this.opts.workspaceRoot
     const id = crypto.randomUUID()
     this.currentTurnId = id
+    this.currentTurnSignal = signal ?? null
     this.turnAbort = new AbortController()
     const localAbort = this.turnAbort
 
-    const onAbort = () => this.abort()
+    const onAbort = () => this.abort(signal)
     if (signal) {
       if (signal.aborted) {
         this.emitAborted(onEvent)
-        this.currentTurnId = null
+        this.clearCurrentTurn(id)
         return
       }
       signal.addEventListener('abort', onAbort, { once: true })
@@ -166,7 +189,7 @@ export class CcbSlot implements AgentSlot {
         type: 'error',
         message: `Agent Slot / CCB 不可用: ${err instanceof Error ? err.message : String(err)}`,
       })
-      this.currentTurnId = null
+      this.clearCurrentTurn(id)
       if (signal) signal.removeEventListener('abort', onAbort)
       return
     }
@@ -174,7 +197,7 @@ export class CcbSlot implements AgentSlot {
     // Abort may have fired during ensureChild before waiter was registered.
     if (signal?.aborted || localAbort.signal.aborted) {
       this.emitAborted(onEvent)
-      this.currentTurnId = null
+      this.clearCurrentTurn(id)
       if (signal) signal.removeEventListener('abort', onAbort)
       return
     }
@@ -185,7 +208,7 @@ export class CcbSlot implements AgentSlot {
         type: 'error',
         message: 'Agent Slot / CCB 不可用: child stdin unavailable',
       })
-      this.currentTurnId = null
+      this.clearCurrentTurn(id)
       if (signal) signal.removeEventListener('abort', onAbort)
       return
     }
@@ -239,7 +262,7 @@ export class CcbSlot implements AgentSlot {
       }
     }).finally(() => {
       if (signal) signal.removeEventListener('abort', onAbort)
-      if (this.currentTurnId === id) this.currentTurnId = null
+      this.clearCurrentTurn(id)
     })
   }
 

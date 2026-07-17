@@ -19,10 +19,12 @@ export function createChatRoutes(
     }
 
     const encoder = new TextEncoder()
+    // Scope disconnect to this request's signal. Unscoped slot.abort() would
+    // kill the in-flight turn when a *queued* client drops under serial turnChain.
     const signal = c.req.raw.signal
 
     const onAbort = () => {
-      resolved.abort()
+      resolved.abort(signal)
     }
     signal.addEventListener('abort', onAbort)
 
@@ -56,7 +58,7 @@ export function createChatRoutes(
         }
       },
       cancel() {
-        resolved.abort()
+        resolved.abort(signal)
         signal.removeEventListener('abort', onAbort)
       },
     })

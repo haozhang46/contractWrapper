@@ -2,6 +2,7 @@
  * Fake CCB stdio agent for CcbSlot tests.
  * Reads JSONL from stdin; on `turn`, emits text-delta + done with matching id.
  * Content "slow" waits until abort (or 5s timeout) before responding.
+ * Content "delay" waits ~200ms then completes normally (for queue/abort tests).
  */
 const decoder = new TextDecoder()
 let buffer = ''
@@ -64,6 +65,12 @@ async function processLine(line: string): Promise<void> {
     if (content === 'slow') {
       await waitOrAbort(msg.id, 5000)
       // Parent aborts; do not emit done so hang would surface without CcbSlot fix.
+      return
+    }
+    if (content === 'delay') {
+      await Bun.sleep(200)
+      writeEvent({ type: 'text-delta', content: 'pong', id: msg.id })
+      writeEvent({ type: 'done', messageId: 'x', id: msg.id })
       return
     }
     writeEvent({ type: 'text-delta', content: 'pong', id: msg.id })

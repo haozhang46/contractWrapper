@@ -179,4 +179,46 @@ describe('CcbSlot', () => {
       expect(err.message).toContain('aborted')
     }
   })
+
+  test('queued turn abort does not kill in-flight turn', async () => {
+    const slot = createTestSlot()
+    await slot.initSession({ workspaceRoot: '/tmp' })
+    const eventsA: SlotEvent[] = []
+    const eventsB: SlotEvent[] = []
+    const acA = new AbortController()
+    const acB = new AbortController()
+
+    const turnA = slot.sendMessageWithHistory(
+      [{ role: 'user', content: 'delay' }],
+      e => eventsA.push(e),
+      acA.signal,
+    )
+    const turnB = slot.sendMessageWithHistory(
+      [{ role: 'user', content: 'two' }],
+      e => eventsB.push(e),
+      acB.signal,
+    )
+
+    // A is in-flight; B is queued. Simulate createChatRoutes disconnect on B:
+    // abort B's signal and call slot.abort(B.signal) — must not kill A.
+    await Bun.sleep(50)
+    acB.abort()
+    slot.abort(acB.signal)
+
+    await Promise.race([
+      Promise.all([turnA, turnB]),
+      Bun.sleep(3000).then(() => {
+        throw new Error('turns hung after queued abort')
+      }),
+    ])
+
+    expect(eventsA.some(e => e.type === 'text-delta')).toBe(true)
+    expect(eventsA.at(-1)?.type).toBe('done')
+    expect(eventsB.some(e => e.type === 'error')).toBe(true)
+    const errB = eventsB.find(e => e.type === 'error')
+    if (errB?.type === 'error') {
+      expect(errB.message).toContain('aborted')
+    }
+    expect(eventsB.every(e => e.type !== 'done')).toBe(true)
+  })
 })
