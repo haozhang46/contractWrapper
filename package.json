@@ -1,0 +1,12 @@
+{
+  "name": "harness-console",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "web:dev": "bun run --filter @harness/web dev",
+    "control:dev": "bun run --filter @harness/control dev",
+    "agent:dev": "bun run scripts/agent-dev.ts",
+    "test": "bun test packages apps/control",
+    "typecheck": "bun run --filter '*' typecheck"
+  }
+}

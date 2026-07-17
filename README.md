@@ -23,6 +23,15 @@ bun run dev   # 需真实终端 TTY；或 bun dist/cli-bun.js
 
 首次在 REPL 内 `/login` 配置模型供应商。
 
+## 本地跑中控（分离后）
+
+```bash
+bun install
+bun run control:dev   # :3100 HTTP + MCP
+bun run web:dev       # :5173 → proxy /api → :3100
+# 另开终端：bun run agent:dev  # CCB 无头 + Control MCP（fail-closed）
+```
+
 ## 文档
 
 - [北极星架构](./docs/superpowers/specs/2026-07-17-harness-control-console-north-star-design.md)
