@@ -79,6 +79,7 @@ export default function ChatPanel(): ReactElement {
             content: m.content,
             timestamp: new Date().toISOString(),
             status: 'complete' as const,
+            toolCalls: m.toolCalls,
           })),
         )
       }
@@ -94,7 +95,13 @@ export default function ChatPanel(): ReactElement {
       try {
         const apiMessages = msgs
           .filter(m => m.role === 'user' || m.role === 'assistant')
-          .map(m => ({ role: m.role, content: m.content }))
+          .map(m => ({
+            role: m.role,
+            content: m.content,
+            ...(m.toolCalls && m.toolCalls.length > 0
+              ? { toolCalls: m.toolCalls }
+              : {}),
+          }))
         const sessionTitle =
           title ??
           msgs.find(m => m.role === 'user')?.content.slice(0, 50) ??
@@ -150,7 +157,8 @@ export default function ChatPanel(): ReactElement {
     }
 
     const history = [...messages, userMsg]
-    setMessages([...history, assistantMsg])
+    let live: ChatMessage[] = [...history, assistantMsg]
+    setMessages(live)
     setInput('')
     setStreaming(true)
 
@@ -188,7 +196,8 @@ export default function ChatPanel(): ReactElement {
           if (!line.startsWith('data: ')) continue
           const data = line.slice(6)
           if (data === '[DONE]') {
-            setMessages(markAssistantComplete)
+            live = markAssistantComplete(live)
+            setMessages(live)
             break
           }
           try {
@@ -201,7 +210,8 @@ export default function ChatPanel(): ReactElement {
             if (event.type === 'text-delta' && event.content) {
               fullContent += event.content
             }
-            setMessages(prev => applyChatStreamEvent(prev, event))
+            live = applyChatStreamEvent(live, event)
+            setMessages(live)
           } catch {
             // ignore malformed stream chunks
           }
@@ -209,32 +219,25 @@ export default function ChatPanel(): ReactElement {
       }
 
       if (ac.signal.aborted) {
-        setMessages(prev => {
-          const last = prev[prev.length - 1]
-          if (!last || last.role !== 'assistant') return prev
-          return [
-            ...prev.slice(0, -1),
+        const last = live[live.length - 1]
+        if (last?.role === 'assistant') {
+          live = [
+            ...live.slice(0, -1),
             {
               ...last,
               status: 'complete',
               content: last.content || '(stopped)',
             },
           ]
-        })
+          setMessages(live)
+          void saveSession(live)
+        }
         return
       }
 
-      const finalHistory: ChatMessage[] = [
-        ...history,
-        {
-          id: assistantMsg.id,
-          role: 'assistant',
-          content: fullContent,
-          timestamp: new Date().toISOString(),
-          status: 'complete',
-        },
-      ]
-      void saveSession(finalHistory)
+      live = markAssistantComplete(live)
+      setMessages(live)
+      void saveSession(live)
 
       fetch('/api/memory/extract', {
         method: 'POST',
@@ -257,25 +260,25 @@ export default function ChatPanel(): ReactElement {
         .catch(() => {})
     } catch (err) {
       if (ac.signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
-        setMessages(prev => {
-          const last = prev[prev.length - 1]
-          if (!last || last.role !== 'assistant') return prev
-          return [
-            ...prev.slice(0, -1),
+        const last = live[live.length - 1]
+        if (last?.role === 'assistant') {
+          live = [
+            ...live.slice(0, -1),
             {
               ...last,
               status: 'complete',
               content: last.content || '(stopped)',
             },
           ]
-        })
+          setMessages(live)
+          void saveSession(live)
+        }
       } else {
-        setMessages(prev =>
-          applyChatStreamEvent(prev, {
-            type: 'error',
-            message: String(err),
-          }),
-        )
+        live = applyChatStreamEvent(live, {
+          type: 'error',
+          message: String(err),
+        })
+        setMessages(live)
       }
     } finally {
       if (abortRef.current === ac) abortRef.current = null
@@ -414,7 +417,6 @@ function MessageBubble({ message }: { message: ChatMessage }): ReactElement {
       <div
         className={`message__bubble${isUser ? ' message__bubble--user' : ' message__bubble--assistant'}`}
       >
-        <p className="message__content">{message.content || ' '}</p>
         {message.toolCalls && message.toolCalls.length > 0 && (
           <div className="message__tool-calls">
             {message.toolCalls.map(tc => (
@@ -422,6 +424,7 @@ function MessageBubble({ message }: { message: ChatMessage }): ReactElement {
             ))}
           </div>
         )}
+        <p className="message__content">{message.content || ' '}</p>
         {message.status === 'streaming' && (
           <span className="message__streaming-cursor" />
         )}
@@ -431,13 +434,27 @@ function MessageBubble({ message }: { message: ChatMessage }): ReactElement {
 }
 
 function ToolCallCard({ toolCall }: { toolCall: ToolCallEvent }): ReactElement {
+  const [expanded, setExpanded] = useState(false)
+  const hasOutput = Boolean(toolCall.output)
+
   return (
     <div className="tool-call">
-      <span className="tool-call__status" data-status={toolCall.status}>
-        [{toolCall.status}]
-      </span>{' '}
-      <span className="tool-call__name">{toolCall.toolName}</span>
-      {toolCall.output && (
+      <button
+        type="button"
+        className="tool-call__header"
+        onClick={() => hasOutput && setExpanded(v => !v)}
+        disabled={!hasOutput}
+        aria-expanded={hasOutput ? expanded : undefined}
+      >
+        <span className="tool-call__chevron" data-expanded={expanded && hasOutput}>
+          {hasOutput ? (expanded ? '▾' : '▸') : '·'}
+        </span>
+        <span className="tool-call__status" data-status={toolCall.status}>
+          [{toolCall.status}]
+        </span>
+        <span className="tool-call__name">{toolCall.toolName}</span>
+      </button>
+      {hasOutput && expanded && (
         <pre className="tool-call__output">
           {toolCall.output}
         </pre>

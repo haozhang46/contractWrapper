@@ -8,9 +8,18 @@ import {
 } from 'node:fs'
 import { join } from 'node:path'
 
+export interface ChatSessionToolCall {
+  id: string
+  toolName: string
+  input: Record<string, unknown>
+  output?: string
+  status: 'pending' | 'running' | 'complete' | 'error'
+}
+
 export interface ChatSessionMessage {
   role: string
   content: string
+  toolCalls?: ChatSessionToolCall[]
 }
 
 export interface ChatSessionMeta {

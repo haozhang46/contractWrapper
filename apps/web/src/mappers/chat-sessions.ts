@@ -1,4 +1,4 @@
-import type { ApiSessionMeta, ApiSessionDetail, ApiChatMessage } from '../types/api'
+import type { ApiSessionMeta, ApiSessionDetail, ApiToolCall } from '../types/api'
 
 // --- DTO types (UI-ready) ---
 
@@ -11,7 +11,11 @@ export interface SessionMetaDTO {
 
 export interface SessionDetailDTO {
   id: string
-  messages: Array<{ role: 'user' | 'assistant' | 'system' | 'tool'; content: string }>
+  messages: Array<{
+    role: 'user' | 'assistant' | 'system' | 'tool'
+    content: string
+    toolCalls?: ApiToolCall[]
+  }>
 }
 
 // --- Mappers ---
@@ -36,6 +40,7 @@ export function toSessionDetail(raw: ApiSessionDetail): SessionDetailDTO {
     messages: (raw.messages ?? []).map(m => ({
       role: m.role,
       content: m.content,
+      toolCalls: m.toolCalls,
     })),
   }
 }

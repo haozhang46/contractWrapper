@@ -17,7 +17,17 @@ export function createChatSessionsRoutes(workspaceRoot: string): Hono {
     const body = await c.req.json<{
       id?: string
       title?: string
-      messages?: Array<{ role: string; content: string }>
+      messages?: Array<{
+        role: string
+        content: string
+        toolCalls?: Array<{
+          id: string
+          toolName: string
+          input: Record<string, unknown>
+          output?: string
+          status: 'pending' | 'running' | 'complete' | 'error'
+        }>
+      }>
     }>()
     if (!body.id || typeof body.id !== 'string') {
       return c.json({ error: 'id is required' }, 400)

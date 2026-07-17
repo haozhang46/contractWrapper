@@ -116,6 +116,7 @@ stdio bridge **启动 CCB 子进程时必须**：
 
 - 新增薄入口（例如 `ccb/src/harness/stdioBridge.ts` 或等价）：读 stdin → 调 `runCCBAgent` → 写 stdout
 - `ccb-runner`：从旧 T1 worktree 迁入 CCB fork 的薄目录（**不是**整棵 `ccb/harness` 产品树）
+- **Agent loop：** `runCCBAgent` 只 bootstrap 并调用 CCB `ask()` / QueryEngine（commands + agents 全开）；不做 DIY OpenAI tool 循环。详见 [query loop 设计](./2026-07-17-harness-ccb-query-loop-design.md)
 - 启动时挂上既有 Control MCP client（onion）；连不上则工具 fail-closed
 
 ### `/api/chat` 行为变更

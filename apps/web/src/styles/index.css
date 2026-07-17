@@ -230,11 +230,19 @@
 
 /* -- Tool call card -- */
 .message__tool-calls {
-  @apply mt-2 space-y-1;
+  @apply mb-2 space-y-1;
 }
 
 .tool-call {
   @apply text-xs bg-zinc-900/50 rounded px-2 py-1.5 border border-zinc-700/50;
+}
+
+.tool-call__header {
+  @apply flex items-center gap-1.5 w-full text-left bg-transparent border-0 p-0 cursor-pointer disabled:cursor-default;
+}
+
+.tool-call__chevron {
+  @apply text-zinc-500 w-2.5 shrink-0;
 }
 
 .tool-call__status {

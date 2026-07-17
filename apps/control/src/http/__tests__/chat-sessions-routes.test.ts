@@ -62,6 +62,41 @@ describe('/api/chat-sessions', () => {
     expect((await listAfter.json()).sessions).toEqual([])
   })
 
+  test('PUT persists toolCalls on assistant messages', async () => {
+    const app = createApp({ workspaceRoot: root })
+    const id = 'chat_tools_1'
+    const messages = [
+      { role: 'user', content: 'search something' },
+      {
+        role: 'assistant',
+        content: 'here you go',
+        toolCalls: [
+          {
+            id: 'tc1',
+            toolName: 'WebSearch',
+            input: { query: 'something' },
+            output: 'results…',
+            status: 'complete',
+          },
+        ],
+      },
+    ]
+
+    const putRes = await app.request('http://localhost/api/chat-sessions', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, title: 'tools', messages }),
+    })
+    expect(putRes.status).toBe(200)
+
+    const getRes = await app.request(
+      `http://localhost/api/chat-sessions/${id}`,
+    )
+    expect(getRes.status).toBe(200)
+    const getBody = await getRes.json()
+    expect(getBody.messages).toEqual(messages)
+  })
+
   test('GET unknown id returns 404', async () => {
     const app = createApp({ workspaceRoot: root })
     const res = await app.request(

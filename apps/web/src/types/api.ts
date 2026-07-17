@@ -16,9 +16,18 @@ export interface ApiSessionDetail {
   messages?: ApiChatMessage[]
 }
 
+export interface ApiToolCall {
+  id: string
+  toolName: string
+  input: Record<string, unknown>
+  output?: string
+  status: 'pending' | 'running' | 'complete' | 'error'
+}
+
 export interface ApiChatMessage {
   role: 'user' | 'assistant' | 'system' | 'tool'
   content: string
+  toolCalls?: ApiToolCall[]
 }
 
 export interface ApiOnionResponse {
