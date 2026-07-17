@@ -1,12 +1,17 @@
 console.log(`
-agent-dev: start Control with MCP:
-  HARNESS_MCP=1 bun run control:dev
-Then run CCB with:
-  HARNESS_ONION_MCP=1 bun run --cwd ccb dev
-Fail-closed: if Control MCP client not set, tools are denied.
+agent-dev: process-separation local dev
 
-Register the Control MCP client before tool use:
+1. Start Control (MCP server):
+   HARNESS_MCP=1 bun run control:dev
+
+2. Start CCB (agent):
+   HARNESS_ONION_MCP=1 HARNESS_CONTROL_MCP=stdio bun run --cwd ccb dev
+
+Fail-closed: with HARNESS_ONION_MCP=1, tools are denied until Control is reachable.
+
+MCP client registration (required until auto-stdio connect lands):
+  Unit tests and local wiring call setControlMcpClient() before tool use.
   import { setControlMcpClient } from './src/harness/mcpOnionBridge.js'
-  setControlMcpClient(yourMcpBridgeClient)
-Requires HARNESS_CONTROL_MCP=stdio when registering a stdio client.
+  setControlMcpClient({ callTool: (name, args) => mcpClient.callTool({ name, arguments: args }) })
+  HARNESS_CONTROL_MCP=stdio must be set when using a registered stdio client.
 `)
