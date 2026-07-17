@@ -42,3 +42,4 @@ bun run web:dev       # :5173 → proxy /api → :3100
 
 - [北极星架构](./docs/superpowers/specs/2026-07-17-harness-control-console-north-star-design.md)
 - [Spec 线](./docs/superpowers/specs/2026-07-17-harness-control-console-spec-line.md)
+- [会话交接（下一个 Chat 从这里继续）](./docs/superpowers/handoffs/2026-07-17-continue-from-ccb-understand.md)
