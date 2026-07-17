@@ -1,4 +1,5 @@
 import type { AgentSlot } from '@harness/slot'
+import { CcbSlot } from './ccb-slot.ts'
 
 let override: AgentSlot | null = null
 
@@ -6,7 +7,7 @@ export function setDefaultSlotForTests(slot: AgentSlot | null): void {
   override = slot
 }
 
-export function getDefaultSlot(_workspaceRoot: string): AgentSlot {
+export function getDefaultSlot(workspaceRoot: string): AgentSlot {
   if (override) return override
-  throw new Error('Default CcbSlot not wired yet') // Task 4 replaces this
+  return new CcbSlot({ workspaceRoot })
 }
