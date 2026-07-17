@@ -4,6 +4,7 @@ import { onionRuntime } from '../onionSingleton.ts'
 import type { PendingStore } from '../pending/store.ts'
 import { pendingStore } from '../pendingSingleton.ts'
 import { createAgentOnionRoutes } from './routes/agent-onion.ts'
+import { createChatRoutes } from './routes/chat.ts'
 import { createCharterRoutes } from './routes/charter.ts'
 import { createConfirmRoutes } from './routes/confirm.ts'
 import { createOnionRoutes } from './routes/onion.ts'
@@ -19,6 +20,7 @@ export function createApp({
   loadOnion(workspaceRoot)
 
   const app = new Hono()
+  app.route('/api/chat', createChatRoutes(workspaceRoot))
   app.route('/api/onion', createOnionRoutes(workspaceRoot))
   app.route('/api/charter', createCharterRoutes(workspaceRoot))
   app.route('/api/pending', createPendingRoutes(pending))

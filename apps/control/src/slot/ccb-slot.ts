@@ -1,5 +1,4 @@
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import type {
   AgentSlot,
   SlotEvent,
@@ -30,8 +29,9 @@ type AbortCommand = {
 
 type ChildEvent = SlotEvent & { id?: string }
 
-const REPO_ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '../../../..')
-const DEFAULT_BRIDGE = join(REPO_ROOT, 'ccb/src/harness/stdioBridge.ts')
+function bridgePath(workspaceRoot: string): string {
+  return join(workspaceRoot, 'ccb/src/harness/stdioBridge.ts')
+}
 
 function defaultEnv(workspaceRoot: string): Record<string, string> {
   const port = process.env.CONTROL_PORT || '3100'
@@ -252,7 +252,7 @@ export class CcbSlot implements AgentSlot {
 
     const command = this.opts.spawnCommand ?? process.execPath
     const args =
-      this.opts.spawnArgs ?? [DEFAULT_BRIDGE]
+      this.opts.spawnArgs ?? [bridgePath(workspaceRoot)]
     const cwd = this.opts.cwd ?? workspaceRoot
     const env: Record<string, string | undefined> = {
       ...process.env,
