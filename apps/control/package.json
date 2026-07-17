@@ -1,0 +1,16 @@
+{
+  "name": "@harness/control",
+  "version": "0.0.1",
+  "type": "module",
+  "dependencies": {
+    "@harness/onion": "workspace:*",
+    "@harness/protocol": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "hono": "^4.12.0"
+  },
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}
