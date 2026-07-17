@@ -30,6 +30,15 @@ export function createChatRoutes(
 
     const stream = new ReadableStream({
       async start(controller) {
+        // Keep the SSE connection alive while tools run / wait for Allow
+        // (otherwise proxies or servers may drop a silent stream).
+        const keepalive = setInterval(() => {
+          try {
+            controller.enqueue(encoder.encode(': keepalive\n\n'))
+          } catch {
+            // stream already closed
+          }
+        }, 5_000)
         try {
           await resolved.sendMessageWithHistory(
             messages,
@@ -52,9 +61,14 @@ export function createChatRoutes(
             )
           }
         } finally {
+          clearInterval(keepalive)
           signal.removeEventListener('abort', onAbort)
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'))
-          controller.close()
+          try {
+            controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+            controller.close()
+          } catch {
+            // already cancelled
+          }
         }
       },
       cancel() {

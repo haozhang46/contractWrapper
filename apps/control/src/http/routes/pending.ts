@@ -11,20 +11,35 @@ export function createPendingRoutes(pending: PendingStore): Hono {
   pendingApi.get('/stream', c => {
     const encoder = new TextEncoder()
     let unsubscribe: (() => void) | undefined
+    let keepalive: ReturnType<typeof setInterval> | undefined
 
     const stream = new ReadableStream({
       start(controller) {
         const send = (list: ReturnType<PendingStore['list']>) => {
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify(list)}\n\n`),
-          )
+          try {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ pending: list })}\n\n`,
+              ),
+            )
+          } catch {
+            // closed
+          }
         }
 
         send(pending.list())
         unsubscribe = pending.subscribe(send)
+        keepalive = setInterval(() => {
+          try {
+            controller.enqueue(encoder.encode(': keepalive\n\n'))
+          } catch {
+            // closed
+          }
+        }, 5_000)
       },
       cancel() {
         unsubscribe?.()
+        if (keepalive) clearInterval(keepalive)
       },
     })
 

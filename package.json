@@ -7,7 +7,11 @@
     "web:dev": "bun run --filter @harness/web dev",
     "control:dev": "bun run --filter @harness/control dev",
     "agent:dev": "bun run scripts/agent-dev.ts",
-    "test": "bun test packages apps/control",
+    "test": "bun test packages apps/control apps/web",
     "typecheck": "bun run --filter '*' typecheck"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "typescript": "^7.0.2"
   }
 }

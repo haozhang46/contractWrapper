@@ -1,4 +1,4 @@
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import type {
   AgentSlot,
   SlotEvent,
@@ -29,8 +29,13 @@ type AbortCommand = {
 
 type ChildEvent = SlotEvent & { id?: string }
 
-function bridgePath(workspaceRoot: string): string {
-  return join(workspaceRoot, 'ccb/src/harness/stdioBridge.ts')
+/** Absolute path to CCB stdio bridge entry (monorepo-anchored, not workspaceRoot). */
+export function resolveCcbBridgePath(): string {
+  if (process.env.HARNESS_CCB_BRIDGE) {
+    return process.env.HARNESS_CCB_BRIDGE
+  }
+  // This file: apps/control/src/slot → monorepo root is ../../../..
+  return resolve(import.meta.dir, '../../../../ccb/src/harness/stdioBridge.ts')
 }
 
 function defaultEnv(workspaceRoot: string): Record<string, string> {
@@ -275,7 +280,7 @@ export class CcbSlot implements AgentSlot {
 
     const command = this.opts.spawnCommand ?? process.execPath
     const args =
-      this.opts.spawnArgs ?? [bridgePath(workspaceRoot)]
+      this.opts.spawnArgs ?? [resolveCcbBridgePath()]
     const cwd = this.opts.cwd ?? workspaceRoot
     const env: Record<string, string | undefined> = {
       ...process.env,

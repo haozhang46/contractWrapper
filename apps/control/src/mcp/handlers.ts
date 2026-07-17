@@ -1,6 +1,7 @@
 import type { AuthorizeRequest, AuthorizeResult } from '@harness/protocol'
 import type { EvaluateResult } from '@harness/onion'
 import { writeAudit } from '../audit/write.ts'
+import { loadHeadlessSettings } from '../bootstrap/loadHeadless.ts'
 import type { PendingStore } from '../pending/store.ts'
 
 export async function handleAuthorize(
@@ -18,6 +19,9 @@ export async function handleAuthorize(
   await writeAudit(opts.workspaceRoot, result.auditTrail)
 
   if (result.decision === 'ask') {
+    if (loadHeadlessSettings(opts.workspaceRoot).autoAllow) {
+      return { decision: 'allow' }
+    }
     const message = result.message ?? `Confirm tool ${req.toolName}`
     const { requestId } = pending.create({
       toolName: req.toolName,

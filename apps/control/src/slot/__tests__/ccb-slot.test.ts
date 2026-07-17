@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from 'bun:test'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { SlotEvent } from '@harness/slot'
-import { CcbSlot } from '../ccb-slot.ts'
+import { CcbSlot, resolveCcbBridgePath } from '../ccb-slot.ts'
 import { getDefaultSlot } from '../factory.ts'
 import { encodeJsonl, parseJsonlLine } from '../jsonl.ts'
 
@@ -46,6 +47,20 @@ describe('jsonl helpers', () => {
 })
 
 describe('CcbSlot', () => {
+  test('resolveCcbBridgePath is anchored to monorepo, not process.cwd()', () => {
+    const path = resolveCcbBridgePath()
+    expect(path).toMatch(/ccb[/\\]src[/\\]harness[/\\]stdioBridge\.ts$/)
+    expect(existsSync(path)).toBe(true)
+    const prev = process.cwd()
+    try {
+      process.chdir('/tmp')
+      expect(resolveCcbBridgePath()).toBe(path)
+      expect(existsSync(resolveCcbBridgePath())).toBe(true)
+    } finally {
+      process.chdir(prev)
+    }
+  })
+
   test('CcbSlot turn over stdio', async () => {
     const slot = createTestSlot()
     await slot.initSession({ workspaceRoot: '/tmp' })
