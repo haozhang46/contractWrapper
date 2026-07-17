@@ -1,0 +1,25 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "harness-console",
+    },
+    "packages/onion": {
+      "name": "@harness/onion",
+      "version": "0.0.1",
+      "dependencies": {
+        "@harness/protocol": "workspace:*",
+      },
+    },
+    "packages/protocol": {
+      "name": "@harness/protocol",
+      "version": "0.0.1",
+    },
+  },
+  "packages": {
+    "@harness/onion": ["@harness/onion@workspace:packages/onion"],
+
+    "@harness/protocol": ["@harness/protocol@workspace:packages/protocol"],
+  }
+}
