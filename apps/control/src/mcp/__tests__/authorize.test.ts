@@ -1,4 +1,8 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test, beforeEach, afterEach } from 'bun:test'
+import { mkdirSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { OnionRegistry } from '@harness/onion'
 import { PendingStore } from '../../pending/store.ts'
 import { handleAuthorize } from '../handlers.ts'
 
@@ -55,5 +59,52 @@ describe('handleAuthorize', () => {
     )
     expect(result).toEqual({ decision: 'deny', reason: 'blocked' })
     expect(pending.list().length).toBe(0)
+  })
+
+  test('forwards onionId to evaluate', async () => {
+    const pending = new PendingStore({ defaultTimeoutMs: 60_000 })
+    let capturedOpts: { onionId?: string } | undefined
+    const result = await handleAuthorize(
+      {
+        evaluate: async (_tool, _input, opts) => {
+          capturedOpts = opts
+          return { decision: 'allow' as const, auditTrail: [] }
+        },
+      },
+      pending,
+      { toolName: 'Read', input: {}, sessionId: 's1', onionId: 'strict' },
+      { workspaceRoot: '/tmp' },
+    )
+    expect(capturedOpts).toEqual({ onionId: 'strict' })
+    expect(result).toEqual({ decision: 'allow' })
+  })
+
+  describe('unknown onionId', () => {
+    let root: string
+
+    beforeEach(() => {
+      root = join(
+        tmpdir(),
+        `authorize-onion-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      )
+      mkdirSync(join(root, '.harness'), { recursive: true })
+    })
+
+    afterEach(() => {
+      rmSync(root, { recursive: true, force: true })
+    })
+
+    test('falls back to default without error', async () => {
+      const registry = new OnionRegistry(root)
+      registry.bootstrap()
+      const pending = new PendingStore({ defaultTimeoutMs: 60_000 })
+      const result = await handleAuthorize(
+        registry,
+        pending,
+        { toolName: 'Read', input: { path: 'x' }, sessionId: 's1', onionId: 'missing' },
+        { workspaceRoot: root },
+      )
+      expect(['allow', 'deny', 'needs_confirm']).toContain(result.decision)
+    })
   })
 })

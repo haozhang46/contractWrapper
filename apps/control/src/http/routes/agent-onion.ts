@@ -10,6 +10,7 @@ export function createAgentOnionRoutes(deps: {
     evaluate: (
       tool: string,
       input: Record<string, unknown>,
+      opts?: { onionId?: string },
     ) => Promise<EvaluateResult>
   }
   pendingStore: PendingStore

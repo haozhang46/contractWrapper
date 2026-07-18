@@ -9,13 +9,16 @@ export async function handleAuthorize(
     evaluate: (
       tool: string,
       input: Record<string, unknown>,
+      opts?: { onionId?: string },
     ) => Promise<EvaluateResult>
   },
   pending: PendingStore,
   req: AuthorizeRequest,
   opts: { workspaceRoot: string },
 ): Promise<AuthorizeResult> {
-  const result = await runtime.evaluate(req.toolName, req.input)
+  const result = await runtime.evaluate(req.toolName, req.input, {
+    onionId: req.onionId,
+  })
   await writeAudit(opts.workspaceRoot, result.auditTrail)
 
   if (result.decision === 'ask') {

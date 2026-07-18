@@ -15,6 +15,7 @@ export interface ControlMcpDeps {
     evaluate: (
       tool: string,
       input: Record<string, unknown>,
+      opts?: { onionId?: string },
     ) => Promise<EvaluateResult>
   }
   pendingStore: PendingStore
@@ -50,6 +51,10 @@ export function createControlMcpServer(deps: ControlMcpDeps): Server {
             description: {
               type: 'string',
               description: 'Optional display hint for confirm UI',
+            },
+            onionId: {
+              type: 'string',
+              description: 'Optional named onion to evaluate against (defaults to default)',
             },
           },
           required: ['toolName', 'input', 'sessionId'],
@@ -92,6 +97,8 @@ export function createControlMcpServer(deps: ControlMcpDeps): Server {
             args?.input && typeof args.input === 'object' && !Array.isArray(args.input)
               ? (args.input as Record<string, unknown>)
               : {}
+          const onionId =
+            typeof args?.onionId === 'string' ? args.onionId : undefined
 
           if (!toolName || !sessionId) {
             return {
@@ -108,7 +115,7 @@ export function createControlMcpServer(deps: ControlMcpDeps): Server {
           const result = await handleAuthorize(
             onionRuntime,
             pendingStore,
-            { toolName, input, sessionId },
+            { toolName, input, sessionId, onionId },
             { workspaceRoot },
           )
 
