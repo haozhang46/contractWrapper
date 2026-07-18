@@ -63,6 +63,7 @@ describe('applyOpenAiEndpointToClaudeSettings', () => {
     const settings = readSettings(tempHome)
     expect(settings.modelType).toBe('openai')
     expect(settings.endpointMode).toBe('ollama-remote')
+    expect(settings.cloudEndpointSnapshot).toBeUndefined()
     expect(settings.env).toEqual({
       CLAUDE_CODE_USE_OPENAI: '1',
       OPENAI_BASE_URL: 'http://192.168.1.7:8080/v1',
@@ -193,6 +194,21 @@ describe('applyOpenAiEndpointToClaudeSettings', () => {
 
     expect(result).toEqual({ ok: false, warning: 'disk full' })
   })
+
+  test('does not snapshot when prior settings are empty', () => {
+    applyOpenAiEndpointToClaudeSettings(
+      {
+        endpointMode: 'ollama-remote',
+        baseUrl: 'http://192.168.1.7:8080/v1',
+        model: 'qwen2.5',
+        apiKey: 'ollama',
+      },
+      { homeDir: tempHome },
+    )
+
+    const settings = readSettings(tempHome)
+    expect(settings.cloudEndpointSnapshot).toBeUndefined()
+  })
 })
 
 describe('restoreCloudEndpointToClaudeSettings', () => {
@@ -248,6 +264,57 @@ describe('restoreCloudEndpointToClaudeSettings', () => {
       OPENAI_BASE_URL: 'http://127.0.0.1:11434/v1',
       OPENAI_MODEL: 'llama3',
     })
+  })
+
+  test('clears OpenAI env when snapshot exists without env key', () => {
+    writeSettings(tempHome, {
+      modelType: 'openai',
+      endpointMode: 'ollama-remote',
+      cloudEndpointSnapshot: {
+        modelType: 'anthropic',
+      },
+      env: {
+        CLAUDE_CODE_USE_OPENAI: '1',
+        OPENAI_BASE_URL: 'http://192.168.1.7:8080/v1',
+        OPENAI_API_KEY: 'ollama',
+        OPENAI_MODEL: 'qwen2.5',
+      },
+    })
+
+    restoreCloudEndpointToClaudeSettings({ homeDir: tempHome })
+
+    const settings = readSettings(tempHome)
+    expect(settings.endpointMode).toBe('cloud')
+    expect(settings.modelType).toBe('anthropic')
+    expect(settings.env).toEqual({})
+  })
+
+  test('apply from empty settings then restore clears legacy empty snapshot OpenAI leftovers', () => {
+    applyOpenAiEndpointToClaudeSettings(
+      {
+        endpointMode: 'ollama-local',
+        baseUrl: 'http://127.0.0.1:11434/v1',
+        model: 'llama3',
+        apiKey: 'ollama',
+      },
+      { homeDir: tempHome },
+    )
+
+    expect(readSettings(tempHome).cloudEndpointSnapshot).toBeUndefined()
+
+    writeSettings(tempHome, {
+      ...readSettings(tempHome),
+      cloudEndpointSnapshot: {},
+    })
+
+    restoreCloudEndpointToClaudeSettings({ homeDir: tempHome })
+
+    const settings = readSettings(tempHome)
+    expect(settings.endpointMode).toBe('cloud')
+    expect(settings.env).toEqual({})
+    const env = settings.env as Record<string, string>
+    expect(env.OPENAI_BASE_URL).toBeUndefined()
+    expect(env.CLAUDE_CODE_USE_OPENAI).toBeUndefined()
   })
 
   test('returns warning when write fails', () => {

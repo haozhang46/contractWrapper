@@ -11,6 +11,7 @@ export default function LLMSettings(): ReactElement {
   const [settings, setSettings] = useState<LLMSettingsDTO | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveWarning, setSaveWarning] = useState<string | null>(null)
   const [models, setModels] = useState<string[]>([])
   const [modelsError, setModelsError] = useState<string | null>(null)
   const [loadingModels, setLoadingModels] = useState(false)
@@ -131,6 +132,7 @@ export default function LLMSettings(): ReactElement {
   const save = async () => {
     if (!settings) return
     setSaving(true)
+    setSaveWarning(null)
     try {
       const body =
         settings.endpointMode === 'ollama-remote'
@@ -149,8 +151,11 @@ export default function LLMSettings(): ReactElement {
         body: JSON.stringify(body),
       })
       if (!res.ok) return
-      const data = (await res.json()) as LLMSettingsDTO
+      const data = (await res.json()) as LLMSettingsDTO & { warning?: string }
       setSettings(toLLMSettings(data))
+      if (typeof data.warning === 'string' && data.warning.length > 0) {
+        setSaveWarning(data.warning)
+      }
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } finally {
@@ -365,6 +370,15 @@ export default function LLMSettings(): ReactElement {
       >
         {saving ? 'Saving...' : saved ? 'Saved (slot will reload)' : 'Save'}
       </button>
+
+      {saveWarning ? (
+        <p
+          className="form-field__hint"
+          style={{ color: 'var(--color-danger, #b33)' }}
+        >
+          Saved, but Claude settings sync failed: {saveWarning}
+        </p>
+      ) : null}
     </div>
   )
 }

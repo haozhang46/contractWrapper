@@ -58,17 +58,27 @@ function loadClaudeSettings(
   }
 }
 
+function hasMeaningfulCloudConfig(settings: ClaudeUserSettings): boolean {
+  if (settings.modelType !== undefined && settings.modelType !== '') return true
+  return settings.env !== undefined && Object.keys(settings.env).length > 0
+}
+
 function shouldSnapshot(settings: ClaudeUserSettings): boolean {
+  if (!hasMeaningfulCloudConfig(settings)) return false
   if (!settings.cloudEndpointSnapshot) return true
   const mode = settings.endpointMode
   return mode === undefined || mode === 'cloud'
 }
 
 function takeSnapshot(settings: ClaudeUserSettings): CloudEndpointSnapshot {
-  return {
-    modelType: settings.modelType,
-    env: settings.env ? { ...settings.env } : undefined,
+  const snapshot: CloudEndpointSnapshot = {}
+  if (settings.modelType !== undefined) {
+    snapshot.modelType = settings.modelType
   }
+  if (settings.env && Object.keys(settings.env).length > 0) {
+    snapshot.env = { ...settings.env }
+  }
+  return snapshot
 }
 
 function writeClaudeSettings(
@@ -138,9 +148,8 @@ export function restoreCloudEndpointToClaudeSettings(
       if (snapshot.modelType !== undefined) {
         settings.modelType = snapshot.modelType
       }
-      if (snapshot.env !== undefined) {
-        settings.env = { ...snapshot.env }
-      }
+      settings.env =
+        snapshot.env !== undefined ? { ...snapshot.env } : {}
     }
 
     settings.endpointMode = 'cloud'
