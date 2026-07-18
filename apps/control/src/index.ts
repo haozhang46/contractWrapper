@@ -4,7 +4,7 @@ import { initHarnessDir } from './bootstrap/init.ts'
 import { loadOnion } from './bootstrap/loadOnion.ts'
 import { resolveWorkspaceRoot } from './bootstrap/resolveWorkspaceRoot.ts'
 import { startControlMcpServer } from './mcp/server.ts'
-import { onionRuntime } from './onionSingleton.ts'
+import { onionRegistry } from './onionSingleton.ts'
 import { pendingStore } from './pendingSingleton.ts'
 
 const workspaceRoot = resolveWorkspaceRoot()
@@ -30,7 +30,7 @@ console.log(`[control] HTTP :${port} workspace=${workspaceRoot}`)
 if (enableMcp) {
   void startControlMcpServer({
     workspaceRoot,
-    onionRuntime,
+    onionRuntime: onionRegistry,
     pendingStore,
   })
 }

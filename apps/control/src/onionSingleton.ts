@@ -1,3 +1,9 @@
-import { OnionRuntime } from '@harness/onion'
+import { OnionRegistry } from '@harness/onion'
 
-export const onionRuntime = new OnionRuntime()
+export let onionRegistry: OnionRegistry
+
+export function initOnionRegistry(workspaceRoot: string): OnionRegistry {
+  onionRegistry = new OnionRegistry(workspaceRoot)
+  onionRegistry.bootstrap()
+  return onionRegistry
+}

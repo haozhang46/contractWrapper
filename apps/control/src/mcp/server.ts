@@ -5,13 +5,18 @@ import {
   ListToolsRequestSchema,
   type CallToolResult,
 } from '@modelcontextprotocol/sdk/types.js'
-import type { OnionRuntime } from '@harness/onion'
+import type { EvaluateResult } from '@harness/onion'
 import type { PendingStore } from '../pending/store.ts'
 import { handleAuthorize, handleWaitResolve } from './handlers.ts'
 
 export interface ControlMcpDeps {
   workspaceRoot: string
-  onionRuntime: OnionRuntime
+  onionRuntime: {
+    evaluate: (
+      tool: string,
+      input: Record<string, unknown>,
+    ) => Promise<EvaluateResult>
+  }
   pendingStore: PendingStore
 }
 

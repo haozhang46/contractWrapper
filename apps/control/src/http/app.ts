@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { loadOnion } from '../bootstrap/loadOnion.ts'
-import { onionRuntime } from '../onionSingleton.ts'
+import { onionRegistry } from '../onionSingleton.ts'
 import type { PendingStore } from '../pending/store.ts'
 import { pendingStore } from '../pendingSingleton.ts'
 import { createAgentOnionRoutes } from './routes/agent-onion.ts'
@@ -11,6 +11,7 @@ import { createConfirmRoutes } from './routes/confirm.ts'
 import { createHeadlessRoutes } from './routes/headless.ts'
 import { createMemoryRoutes } from './routes/memory.ts'
 import { createOnionRoutes } from './routes/onion.ts'
+import { createOnionsRoutes } from './routes/onions.ts'
 import { createPendingRoutes } from './routes/pending.ts'
 
 export function createApp({
@@ -27,6 +28,7 @@ export function createApp({
   app.route('/api/chat-sessions', createChatSessionsRoutes(workspaceRoot))
   app.route('/api/memory', createMemoryRoutes(workspaceRoot))
   app.route('/api/onion', createOnionRoutes(workspaceRoot))
+  app.route('/api/onions', createOnionsRoutes())
   app.route('/api/charter', createCharterRoutes(workspaceRoot))
   app.route('/api/headless', createHeadlessRoutes(workspaceRoot))
   app.route('/api/pending', createPendingRoutes(pending))
@@ -35,7 +37,7 @@ export function createApp({
     '/api/agent/onion',
     createAgentOnionRoutes({
       workspaceRoot,
-      onionRuntime,
+      onionRuntime: onionRegistry,
       pendingStore: pending,
     }),
   )

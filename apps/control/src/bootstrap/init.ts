@@ -11,6 +11,7 @@ const SKELETON_DIRS = [
   'memory',
   'fusion',
   'workflows',
+  'onions',
 ]
 
 const DEFAULT_CHARTER = `# Workspace Charter
