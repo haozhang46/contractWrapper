@@ -54,13 +54,15 @@ export type WidgetDefinition = {
   id: string                 // stable, e.g. 'skill-factory'
   title: string              // nav label
   order?: number             // lower first; default 100
-  mount: () => ReactElement  // or React.lazy-compatible factory
+  /** Sync factory; shell calls on each render of the active tab. Lazy-load via React.lazy inside the factory if needed. */
+  mount: () => ReactElement
 }
 ```
 
+- Package name：`@harness/widgets`（对齐 `@harness/protocol`）
 - `registerWidget`：同 `id` 重复注册 → **覆盖并 console.warn**（便于 HMR / 生成替换）
 - `listWidgets()`：按 `order` 升序、同 order 按 `id` 稳定排序
-- Shell **只依赖** `packages/widgets` 的 registry API，不硬编码 Skill Factory 组件 import 路径以外的业务细节（bootstrap 可 `import '@harness/widgets/skill-factory'` 完成注册）
+- Shell **只依赖** registry API；bootstrap 侧 effect：`import '@harness/widgets/skill-factory'` 完成注册（具体 export 路径在 plan 里按 package exports 定）
 
 ### Shell 集成
 
