@@ -26,6 +26,8 @@ Chat 走可替换的 Agent Slot（默认 `CcbSlot`）。LLM 真相源是 workspa
 | GET | `/api/llm` | 读 `.harness/llm.json`（缺省给 DeepSeek 默认值） |
 | PUT | `/api/llm` | 写 `llm.json`，然后 **bounce** 默认 slot 子进程 |
 | GET | `/api/llm/ollama/tags?origin=` | 代理 `{origin}/api/tags`，返回 `{ models: string[] }` |
+| GET | `/api/llm/ollama/status` | 探测本机 `127.0.0.1:11434` 是否可达 |
+| POST | `/api/llm/ollama/start` | 未运行则 `open -a Ollama`（macOS）和/或 `ollama serve`，轮询至可达 |
 
 ### Slot 同步
 
