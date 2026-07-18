@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactElement } from 'react'
-import { sfFetch } from './api.ts'
+import { sfFetch, sfRunError } from './api.ts'
 
 type SkillZone = 'staging' | 'published'
 
@@ -76,6 +76,9 @@ export function SkillFactoryPanel(): ReactElement {
         return null
       }
       return r.data
+    } catch (err) {
+      setError(sfRunError(err))
+      return null
     } finally {
       setBusy(false)
     }

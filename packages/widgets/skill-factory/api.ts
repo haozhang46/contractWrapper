@@ -8,6 +8,10 @@ export type SfErr = {
 }
 export type SfResult<T> = SfOk<T> | SfErr
 
+export function sfRunError(err: unknown): { code?: string; message: string } {
+  return { message: err instanceof Error ? err.message : String(err) }
+}
+
 export async function sfFetch<T>(
   path: string,
   init?: RequestInit,
