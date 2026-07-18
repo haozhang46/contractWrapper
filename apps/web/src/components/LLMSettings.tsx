@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type ReactElement } from 'react'
 import { toLLMSettings, type LLMSettingsDTO } from '../mappers/llm'
 import type { EndpointMode } from '../types/api'
+import { buildRemoteSavePatch, canSaveRemote } from './llmRemoteSave'
 
 const LOCAL_ORIGIN = 'http://127.0.0.1:11434'
 const LOCAL_BASE = `${LOCAL_ORIGIN}/v1`
@@ -10,7 +11,6 @@ export default function LLMSettings(): ReactElement {
   const [settings, setSettings] = useState<LLMSettingsDTO | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [remoteOrigin, setRemoteOrigin] = useState('')
   const [models, setModels] = useState<string[]>([])
   const [modelsError, setModelsError] = useState<string | null>(null)
   const [loadingModels, setLoadingModels] = useState(false)
@@ -93,13 +93,6 @@ export default function LLMSettings(): ReactElement {
       .then((data: LLMSettingsDTO) => {
         const next = toLLMSettings(data)
         setSettings(next)
-        if (next.endpointMode === 'ollama-remote' && next.baseUrl) {
-          try {
-            setRemoteOrigin(new URL(next.baseUrl).origin)
-          } catch {
-            setRemoteOrigin(next.baseUrl.replace(/\/v1\/?$/, ''))
-          }
-        }
         if (next.endpointMode === 'ollama-local') {
           void refreshOllamaStatus()
         }
@@ -139,10 +132,21 @@ export default function LLMSettings(): ReactElement {
     if (!settings) return
     setSaving(true)
     try {
+      const body =
+        settings.endpointMode === 'ollama-remote'
+          ? {
+              ...settings,
+              ...buildRemoteSavePatch({
+                baseUrl: settings.baseUrl,
+                model: settings.model,
+                apiKey: settings.apiKey,
+              }),
+            }
+          : settings
       const res = await fetch('/api/llm', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(body),
       })
       if (!res.ok) return
       const data = (await res.json()) as LLMSettingsDTO
@@ -157,7 +161,11 @@ export default function LLMSettings(): ReactElement {
   if (!settings) return <p className="form-field__loading">Loading...</p>
 
   const mode = settings.endpointMode ?? 'cloud'
-  const isOllama = mode === 'ollama-local' || mode === 'ollama-remote'
+  const remoteSaveInput = {
+    baseUrl: settings.baseUrl,
+    model: settings.model,
+    apiKey: settings.apiKey,
+  }
 
   return (
     <div className="form-field">
@@ -170,7 +178,7 @@ export default function LLMSettings(): ReactElement {
         >
           <option value="cloud">Cloud</option>
           <option value="ollama-local">Local Ollama</option>
-          <option value="ollama-remote">Remote Ollama</option>
+          <option value="ollama-remote">Remote</option>
         </select>
       </div>
 
@@ -236,15 +244,31 @@ export default function LLMSettings(): ReactElement {
       {mode === 'ollama-remote' ? (
         <>
           <div>
-            <label className="form-field__label">Ollama Host</label>
+            <label className="form-field__label">Base URL</label>
             <input
               type="text"
-              value={remoteOrigin}
-              onChange={e => setRemoteOrigin(e.target.value)}
-              placeholder="192.168.1.10:11434"
+              value={settings.baseUrl}
+              onChange={e =>
+                setSettings({ ...settings, baseUrl: e.target.value })
+              }
+              placeholder="http://192.168.1.10:11434/v1"
               className="form-field__input"
             />
           </div>
+
+          <div>
+            <label className="form-field__label">Model</label>
+            <input
+              type="text"
+              value={settings.model}
+              onChange={e =>
+                setSettings({ ...settings, model: e.target.value })
+              }
+              placeholder="qwen2.5:7b"
+              className="form-field__input"
+            />
+          </div>
+
           <div>
             <label className="form-field__label">API Key (optional)</label>
             <input
@@ -257,32 +281,6 @@ export default function LLMSettings(): ReactElement {
               className="form-field__input"
             />
           </div>
-          <button
-            type="button"
-            className="form-field__save-btn"
-            disabled={loadingModels || !remoteOrigin.trim()}
-            onClick={() => {
-              const origin = remoteOrigin.trim()
-              const key = settings.apiKey || LOCAL_KEY
-              try {
-                const withScheme = origin.includes('://')
-                  ? origin
-                  : `http://${origin}`
-                const u = new URL(withScheme)
-                setSettings({
-                  ...settings,
-                  provider: 'openai',
-                  baseUrl: `${u.origin}/v1`,
-                  apiKey: key,
-                })
-                void loadModels(u.origin, key)
-              } catch {
-                setModelsError('Invalid host URL')
-              }
-            }}
-          >
-            {loadingModels ? 'Loading models...' : 'List models'}
-          </button>
         </>
       ) : null}
 
@@ -315,7 +313,7 @@ export default function LLMSettings(): ReactElement {
         <p className="form-field__hint">{ollamaStatusMessage}</p>
       ) : null}
 
-      {isOllama ? (
+      {mode === 'ollama-local' ? (
         <div>
           <label className="form-field__label">Model</label>
           {models.length > 0 ? (
@@ -359,7 +357,10 @@ export default function LLMSettings(): ReactElement {
       <button
         type="button"
         onClick={() => void save()}
-        disabled={saving}
+        disabled={
+          saving ||
+          (mode === 'ollama-remote' && !canSaveRemote(remoteSaveInput))
+        }
         className={`form-field__save-btn${saved ? ' form-field__save-btn--saved' : ''}`}
       >
         {saving ? 'Saving...' : saved ? 'Saved (slot will reload)' : 'Save'}
