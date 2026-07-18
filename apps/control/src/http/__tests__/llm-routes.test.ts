@@ -113,4 +113,21 @@ describe('/api/llm', () => {
       globalThis.fetch = prev
     }
   })
+
+  test('POST /ollama/start returns running when already up', async () => {
+    const app = createApp({ workspaceRoot: root })
+    const prev = globalThis.fetch
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ models: [] }), { status: 200 })) as typeof fetch
+    try {
+      const res = await app.request('http://localhost/api/llm/ollama/start', {
+        method: 'POST',
+      })
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.status).toBe('running')
+    } finally {
+      globalThis.fetch = prev
+    }
+  })
 })

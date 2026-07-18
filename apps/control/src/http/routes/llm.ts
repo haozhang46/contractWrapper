@@ -2,9 +2,14 @@ import { Hono } from 'hono'
 import {
   fetchOllamaModelNames,
   loadLLMSettings,
+  LOCAL_OLLAMA_ORIGIN,
   saveLLMSettings,
   type LLMSettings,
 } from '../../llm/settings.ts'
+import {
+  ensureLocalOllamaRunning,
+  isOllamaReachable,
+} from '../../llm/ollamaRuntime.ts'
 import { bounceDefaultSlot } from '../../slot/factory.ts'
 
 export function createLlmRoutes(workspaceRoot: string): Hono {
@@ -25,6 +30,25 @@ export function createLlmRoutes(workspaceRoot: string): Hono {
     })
     bounceDefaultSlot()
     return c.json(saved)
+  })
+
+  api.get('/ollama/status', async c => {
+    const running = await isOllamaReachable(LOCAL_OLLAMA_ORIGIN)
+    return c.json({
+      status: running ? 'running' : 'stopped',
+      origin: LOCAL_OLLAMA_ORIGIN,
+    })
+  })
+
+  api.post('/ollama/start', async c => {
+    const result = await ensureLocalOllamaRunning()
+    const status =
+      result.status === 'error'
+        ? 500
+        : result.status === 'starting'
+          ? 202
+          : 200
+    return c.json(result, status)
   })
 
   api.get('/ollama/tags', async c => {

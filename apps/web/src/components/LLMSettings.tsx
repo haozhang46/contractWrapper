@@ -14,22 +14,22 @@ export default function LLMSettings(): ReactElement {
   const [models, setModels] = useState<string[]>([])
   const [modelsError, setModelsError] = useState<string | null>(null)
   const [loadingModels, setLoadingModels] = useState(false)
+  const [startingOllama, setStartingOllama] = useState(false)
+  const [ollamaStatus, setOllamaStatus] = useState<
+    'unknown' | 'running' | 'stopped' | 'starting' | 'error'
+  >('unknown')
+  const [ollamaStatusMessage, setOllamaStatusMessage] = useState<string | null>(
+    null,
+  )
 
-  useEffect(function loadLLMSettings() {
-    fetch('/api/llm')
-      .then(r => r.json())
-      .then((data: LLMSettingsDTO) => {
-        const next = toLLMSettings(data)
-        setSettings(next)
-        if (next.endpointMode === 'ollama-remote' && next.baseUrl) {
-          try {
-            setRemoteOrigin(new URL(next.baseUrl).origin)
-          } catch {
-            setRemoteOrigin(next.baseUrl.replace(/\/v1\/?$/, ''))
-          }
-        }
-      })
-      .catch(() => {})
+  const refreshOllamaStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/llm/ollama/status')
+      const body = (await res.json()) as { status?: string }
+      setOllamaStatus(body.status === 'running' ? 'running' : 'stopped')
+    } catch {
+      setOllamaStatus('unknown')
+    }
   }, [])
 
   const loadModels = useCallback(async (origin: string, apiKey?: string) => {
@@ -58,6 +58,55 @@ export default function LLMSettings(): ReactElement {
     }
   }, [])
 
+  const startOllama = useCallback(async () => {
+    setStartingOllama(true)
+    setOllamaStatusMessage(null)
+    try {
+      const res = await fetch('/api/llm/ollama/start', { method: 'POST' })
+      const body = (await res.json()) as {
+        status?: string
+        message?: string
+      }
+      setOllamaStatus(
+        body.status === 'running' ||
+          body.status === 'starting' ||
+          body.status === 'error' ||
+          body.status === 'stopped'
+          ? body.status
+          : 'unknown',
+      )
+      setOllamaStatusMessage(body.message ?? null)
+      if (body.status === 'running') {
+        await loadModels(LOCAL_ORIGIN, LOCAL_KEY)
+      }
+    } catch (e) {
+      setOllamaStatus('error')
+      setOllamaStatusMessage(e instanceof Error ? e.message : String(e))
+    } finally {
+      setStartingOllama(false)
+    }
+  }, [loadModels])
+
+  useEffect(function loadLLMSettings() {
+    fetch('/api/llm')
+      .then(r => r.json())
+      .then((data: LLMSettingsDTO) => {
+        const next = toLLMSettings(data)
+        setSettings(next)
+        if (next.endpointMode === 'ollama-remote' && next.baseUrl) {
+          try {
+            setRemoteOrigin(new URL(next.baseUrl).origin)
+          } catch {
+            setRemoteOrigin(next.baseUrl.replace(/\/v1\/?$/, ''))
+          }
+        }
+        if (next.endpointMode === 'ollama-local') {
+          void refreshOllamaStatus()
+        }
+      })
+      .catch(() => {})
+  }, [refreshOllamaStatus])
+
   const setEndpoint = (mode: EndpointMode) => {
     if (!settings) return
     if (mode === 'ollama-local') {
@@ -68,6 +117,7 @@ export default function LLMSettings(): ReactElement {
         baseUrl: LOCAL_BASE,
         apiKey: LOCAL_KEY,
       })
+      void refreshOllamaStatus()
       void loadModels(LOCAL_ORIGIN, LOCAL_KEY)
       return
     }
@@ -237,14 +287,32 @@ export default function LLMSettings(): ReactElement {
       ) : null}
 
       {mode === 'ollama-local' ? (
-        <button
-          type="button"
-          className="form-field__save-btn"
-          disabled={loadingModels}
-          onClick={() => void loadModels(LOCAL_ORIGIN, LOCAL_KEY)}
-        >
-          {loadingModels ? 'Loading models...' : 'Refresh models'}
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="form-field__save-btn"
+            disabled={startingOllama}
+            onClick={() => void startOllama()}
+          >
+            {startingOllama
+              ? 'Starting…'
+              : ollamaStatus === 'running'
+                ? 'Ollama running'
+                : 'Start Ollama'}
+          </button>
+          <button
+            type="button"
+            className="form-field__save-btn"
+            disabled={loadingModels}
+            onClick={() => void loadModels(LOCAL_ORIGIN, LOCAL_KEY)}
+          >
+            {loadingModels ? 'Loading models...' : 'Refresh models'}
+          </button>
+        </div>
+      ) : null}
+
+      {ollamaStatusMessage && mode === 'ollama-local' ? (
+        <p className="form-field__hint">{ollamaStatusMessage}</p>
       ) : null}
 
       {isOllama ? (
