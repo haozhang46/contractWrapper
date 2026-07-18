@@ -193,7 +193,6 @@ if (-not $SkipInstall) {
 Set-OllamaMachineEnv -Bind $HostBind -ListenPort $Port
 Ensure-OllamaFirewallRule -ListenPort $Port
 $healthy = Restart-OllamaApp
-Invoke-OptionalPull -Name $Model
 
 $lan = Get-LanIPv4
 if (-not $lan) {
@@ -216,5 +215,6 @@ if (-not $healthy) {
   exit 1
 }
 
+Invoke-OptionalPull -Name $Model
 Write-Host 'Done. Health check OK.'
 exit 0
