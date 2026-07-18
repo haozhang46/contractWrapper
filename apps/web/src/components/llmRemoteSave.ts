@@ -1,3 +1,5 @@
+import { normalizeOpenAiBaseUrl } from './normalizeOpenAiBaseUrl.ts'
+
 export type RemoteSaveInput = {
   baseUrl: string
   model: string
@@ -13,7 +15,7 @@ export type RemoteSavePatch = {
 }
 
 export function buildRemoteSavePatch(input: RemoteSaveInput): RemoteSavePatch {
-  const baseUrl = input.baseUrl.trim()
+  const baseUrl = normalizeOpenAiBaseUrl(input.baseUrl)
   const model = input.model.trim()
   const trimmedKey = input.apiKey.trim()
 

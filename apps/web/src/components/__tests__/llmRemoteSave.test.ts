@@ -38,6 +38,16 @@ describe('buildRemoteSavePatch', () => {
 
     expect(patch.apiKey).toBe('ollama')
   })
+
+  test('normalizes baseUrl by stripping /chat/completions', () => {
+    const patch = buildRemoteSavePatch({
+      baseUrl: 'http://192.168.1.7:8080/v1/chat/completions',
+      model: 'qwen2.5',
+      apiKey: '',
+    })
+
+    expect(patch.baseUrl).toBe('http://192.168.1.7:8080/v1')
+  })
 })
 
 describe('canSaveRemote', () => {
