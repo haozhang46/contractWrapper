@@ -2,18 +2,21 @@ import { useEffect, useState, type ReactElement } from 'react'
 import { toNamedOnion } from '../mappers/onion'
 import type { ApiNamedOnion } from '../types/api'
 import {
-  BUILTIN_LAYER_TYPES,
   DEFAULT_JS_LAYER_SOURCE,
   isAuditBuiltin,
+  layerMetaLabel,
   type NamedOnion,
   type OnionLayer,
   type OnionLayerType,
 } from '../types/onion'
+import OnionLayerForm from './OnionLayerForm'
 
 interface OnionEditorProps {
   onionId: string
   onBack: () => void
 }
+
+type AddMode = 'builtin' | 'js' | null
 
 function newLayerId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}`
@@ -30,8 +33,7 @@ export default function OnionEditor({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [expandedJsId, setExpandedJsId] = useState<string | null>(null)
-  const [addBuiltinType, setAddBuiltinType] =
-    useState<OnionLayerType>('capability-gate')
+  const [addMode, setAddMode] = useState<AddMode>(null)
 
   useEffect(
     function loadOnion() {
@@ -39,7 +41,7 @@ export default function OnionEditor({
       setError(null)
       fetch(`/api/onions/${encodeURIComponent(onionId)}`)
         .then(async r => {
-          const data = (await r.json()) as ApiNamedOnion & { error?: string }
+          const data = (await r.json()) as ApiNamedOnion
           if (!r.ok) {
             throw new Error(data.error ?? 'Failed to load onion')
           }
@@ -76,7 +78,7 @@ export default function OnionEditor({
           layers: nextLayers,
         }),
       })
-      const data = (await res.json()) as ApiNamedOnion & { error?: string }
+      const data = (await res.json()) as ApiNamedOnion
       if (!res.ok) {
         setError(data.error ?? 'Save failed')
         return false
@@ -95,12 +97,13 @@ export default function OnionEditor({
   }
 
   const toggleLayer = async (id: string) => {
+    const previous = layers
     const updated = layers.map(l =>
       l.id === id ? { ...l, enabled: !l.enabled } : l,
     )
     setLayers(updated)
     const ok = await save(name, updated)
-    if (!ok) setLayers(layers)
+    if (!ok) setLayers(previous)
   }
 
   const moveLayer = async (id: string, direction: 'up' | 'down') => {
@@ -108,22 +111,24 @@ export default function OnionEditor({
     if (idx < 0) return
     const newIdx = direction === 'up' ? idx - 1 : idx + 1
     if (newIdx < 0 || newIdx >= layers.length) return
+    const previous = layers
     const updated = [...layers]
     ;[updated[idx], updated[newIdx]] = [updated[newIdx], updated[idx]]
     const reordered = updated.map((l, i) => ({ ...l, priority: i * 10 }))
     setLayers(reordered)
     const ok = await save(name, reordered)
-    if (!ok) setLayers(layers)
+    if (!ok) setLayers(previous)
   }
 
   const deleteLayer = async (id: string) => {
     const layer = layers.find(l => l.id === id)
     if (!layer || isAuditBuiltin(layer)) return
+    const previous = layers
     const updated = layers.filter(l => l.id !== id)
     setLayers(updated)
     if (expandedJsId === id) setExpandedJsId(null)
     const ok = await save(name, updated)
-    if (!ok) setLayers(layers)
+    if (!ok) setLayers(previous)
   }
 
   const updateJsSource = (id: string, source: string) => {
@@ -138,40 +143,48 @@ export default function OnionEditor({
     await save(name, layers)
   }
 
-  const addBuiltinLayer = async () => {
+  const addBuiltinLayer = async (type: OnionLayerType, layerName: string) => {
+    const previous = layers
     const layer: OnionLayer = {
       id: newLayerId('builtin'),
-      name: addBuiltinType,
+      name: layerName,
       enabled: true,
       priority: layers.length * 10,
       kind: 'builtin',
-      type: addBuiltinType,
+      type,
       config: {},
     }
     const updated = [...layers, layer]
     setLayers(updated)
     const ok = await save(name, updated)
-    if (!ok) setLayers(layers)
+    if (!ok) {
+      setLayers(previous)
+      return
+    }
+    setAddMode(null)
   }
 
-  const addJsLayer = async () => {
+  const addJsLayer = async (layerName: string, source: string) => {
+    const previous = layers
     const id = newLayerId('js')
     const layer: OnionLayer = {
       id,
-      name: 'JS Layer',
+      name: layerName,
       enabled: true,
       priority: layers.length * 10,
       kind: 'js',
-      source: DEFAULT_JS_LAYER_SOURCE,
+      source: source || DEFAULT_JS_LAYER_SOURCE,
     }
     const updated = [...layers, layer]
     setLayers(updated)
     setExpandedJsId(id)
     const ok = await save(name, updated)
     if (!ok) {
-      setLayers(layers)
+      setLayers(previous)
       setExpandedJsId(null)
+      return
     }
+    setAddMode(null)
   }
 
   const saveName = async () => {
@@ -251,11 +264,7 @@ export default function OnionEditor({
 
             <div className="onion-editor__layer-info">
               <p className="onion-editor__layer-name">{layer.name}</p>
-              <p className="onion-editor__layer-meta">
-                {layer.kind === 'js'
-                  ? `js · priority ${layer.priority}`
-                  : `${layer.type} · priority ${layer.priority}`}
-              </p>
+              <p className="onion-editor__layer-meta">{layerMetaLabel(layer)}</p>
             </div>
 
             {layer.kind === 'js' && (
@@ -302,12 +311,10 @@ export default function OnionEditor({
 
           {layer.kind === 'js' && expandedJsId === layer.id && (
             <div className="onion-editor__js-editor">
-              <textarea
-                value={layer.source}
-                onChange={e => updateJsSource(layer.id, e.target.value)}
-                className="onion-editor__js-textarea"
-                rows={8}
-                spellCheck={false}
+              <OnionLayerForm
+                mode="edit-js"
+                source={layer.source}
+                onChange={source => updateJsSource(layer.id, source)}
               />
               <button
                 type="button"
@@ -322,37 +329,42 @@ export default function OnionEditor({
         </div>
       ))}
 
-      <div className="onion-editor__add">
-        <div className="onion-editor__add-builtin">
-          <select
-            value={addBuiltinType}
-            onChange={e => setAddBuiltinType(e.target.value as OnionLayerType)}
-            className="form-field__select"
-          >
-            {BUILTIN_LAYER_TYPES.map(t => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+      {addMode === 'builtin' && (
+        <OnionLayerForm
+          mode="add-builtin"
+          onAdd={(type, layerName) => void addBuiltinLayer(type, layerName)}
+          onCancel={() => setAddMode(null)}
+        />
+      )}
+
+      {addMode === 'js' && (
+        <OnionLayerForm
+          mode="add-js"
+          onAdd={(layerName, source) => void addJsLayer(layerName, source)}
+          onCancel={() => setAddMode(null)}
+        />
+      )}
+
+      {addMode === null && (
+        <div className="onion-editor__add">
           <button
             type="button"
-            onClick={() => void addBuiltinLayer()}
+            onClick={() => setAddMode('builtin')}
             disabled={saving}
             className="onion-editor__add-btn"
           >
             Add builtin
           </button>
+          <button
+            type="button"
+            onClick={() => setAddMode('js')}
+            disabled={saving}
+            className="onion-editor__add-btn"
+          >
+            Add JS layer
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => void addJsLayer()}
-          disabled={saving}
-          className="onion-editor__add-btn"
-        >
-          Add JS layer
-        </button>
-      </div>
+      )}
 
       {saving && <p className="onion-editor__saving">Saving...</p>}
     </div>
