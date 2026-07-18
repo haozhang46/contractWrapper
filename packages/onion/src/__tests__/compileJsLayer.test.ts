@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { compileJsLayer } from '../compileJsLayer.ts'
+import type { OnionEvaluateContext } from '../types.ts'
 
 describe('compileJsLayer', () => {
   test('rejects invalid source', () => {
@@ -8,11 +9,11 @@ describe('compileJsLayer', () => {
 
   test('compiles async middleware', async () => {
     const mw = compileJsLayer('async (ctx, next) => { ctx.message = "ok"; await next() }')
-    const ctx = {
+    const ctx: OnionEvaluateContext = {
       toolName: 'Read',
       input: {},
-      decision: null as 'allow' | 'deny' | 'ask' | null,
-      auditTrail: [] as { layerId: string; decision: string; timestamp: number; detail?: string }[],
+      decision: null,
+      auditTrail: [],
     }
     await mw(ctx, async () => {
       ctx.decision = 'allow'
