@@ -23,6 +23,55 @@ export interface ContractOnion {
   layers: OnionLayerConfig[]
 }
 
+export type OnionLayer =
+  | {
+      id: string
+      name: string
+      enabled: boolean
+      priority: number
+      kind: 'builtin'
+      type: OnionLayerType
+      config: Record<string, unknown>
+    }
+  | {
+      id: string
+      name: string
+      enabled: boolean
+      priority: number
+      kind: 'js'
+      source: string
+    }
+
+export interface NamedOnion {
+  version: 1
+  id: string
+  name: string
+  layers: OnionLayer[]
+}
+
+export interface OnionListItem {
+  id: string
+  name: string
+  layerCount: number
+  isDefault: boolean
+}
+
+export function isDefaultOnionId(id: string): boolean {
+  return id === 'default'
+}
+
+export function toBuiltinLayer(legacy: OnionLayerConfig): OnionLayer {
+  return {
+    id: legacy.id,
+    name: legacy.name,
+    enabled: legacy.enabled,
+    priority: legacy.priority,
+    kind: 'builtin',
+    type: legacy.type,
+    config: legacy.config,
+  }
+}
+
 export interface CapabilityGateConfig {
   level: CapabilityLevel
   allowedTools?: string[]
@@ -35,6 +84,7 @@ export interface AuthorizeRequest {
   sessionId: string
   /** optional display hint */
   description?: string
+  onionId?: string
 }
 
 export type AuthorizeDecision = 'allow' | 'deny' | 'needs_confirm'
