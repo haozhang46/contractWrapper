@@ -1,22 +1,19 @@
 import { useState, type ReactElement } from 'react'
 import {
+  BUILTIN_LAYER_TYPES,
   JS_LAYER_TEMPLATE,
+  type AddableBuiltinLayerType,
   type OnionLayerType,
 } from '../types/onion'
 
-const BUILTIN_TYPES: { value: OnionLayerType; label: string }[] = [
-  { value: 'audit', label: 'Audit Trail' },
-  { value: 'capability-gate', label: 'Capability Gate' },
-  { value: 'require-confirm', label: 'Require Confirm' },
-  { value: 'path-sandbox', label: 'Path Sandbox' },
-  { value: 'network-allowlist', label: 'Network Allowlist' },
-  { value: 'deny-pattern', label: 'Deny Pattern' },
-  { value: 'custom', label: 'Custom' },
-]
+const BUILTIN_TYPE_LABELS: Record<AddableBuiltinLayerType, string> = {
+  'capability-gate': 'Capability Gate',
+  'require-confirm': 'Require Confirm',
+}
 
 interface AddBuiltinProps {
   mode: 'add-builtin'
-  onAdd: (type: OnionLayerType, name: string) => void
+  onAdd: (type: AddableBuiltinLayerType, name: string) => void
   onCancel: () => void
 }
 
@@ -51,7 +48,7 @@ function EditJsSource({
 
 function AddLayerForm(props: AddBuiltinProps | AddJsProps): ReactElement {
   const [name, setName] = useState('')
-  const [type, setType] = useState<OnionLayerType>('custom')
+  const [type, setType] = useState<AddableBuiltinLayerType>('capability-gate')
   const [source, setSource] = useState(JS_LAYER_TEMPLATE)
 
   const submit = () => {
@@ -82,12 +79,12 @@ function AddLayerForm(props: AddBuiltinProps | AddJsProps): ReactElement {
           <label className="form-field__label">Builtin type</label>
           <select
             value={type}
-            onChange={e => setType(e.target.value as OnionLayerType)}
+            onChange={e => setType(e.target.value as AddableBuiltinLayerType)}
             className="form-field__select"
           >
-            {BUILTIN_TYPES.map(t => (
-              <option key={t.value} value={t.value}>
-                {t.label}
+            {BUILTIN_LAYER_TYPES.map(t => (
+              <option key={t} value={t}>
+                {BUILTIN_TYPE_LABELS[t]}
               </option>
             ))}
           </select>

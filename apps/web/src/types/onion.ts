@@ -47,15 +47,13 @@ export const JS_LAYER_TEMPLATE = `async (ctx, next) => {
 
 export const DEFAULT_JS_LAYER_SOURCE = JS_LAYER_TEMPLATE
 
-export const BUILTIN_LAYER_TYPES: OnionLayerType[] = [
-  'audit',
+/** Builtin types users may add via the editor (runtime-implemented only). */
+export const BUILTIN_LAYER_TYPES = [
   'capability-gate',
   'require-confirm',
-  'path-sandbox',
-  'network-allowlist',
-  'deny-pattern',
-  'custom',
-]
+] as const satisfies readonly OnionLayerType[]
+
+export type AddableBuiltinLayerType = (typeof BUILTIN_LAYER_TYPES)[number]
 
 /** @deprecated use NamedOnionDTO */
 export type NamedOnion = NamedOnionDTO
