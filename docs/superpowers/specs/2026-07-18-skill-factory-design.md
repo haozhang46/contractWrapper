@@ -1,7 +1,7 @@
 # Skill Factory — 约定驱动 Skill 自动化生产与评测闭环
 
 **日期：** 2026-07-18  
-**状态：** Draft（待用户审阅 spec 文件）  
+**状态：** Approved（2026-07-18）  
 **产品仓名：** `skill-factory`（完整产品 submodule）  
 **资产仓名：** `skill-assets`（嵌套 submodule，Skill 唯一产出面）  
 **宿主：** `harness-console`（仅 MCP Chat 控制面 + 可选 iframe 看板）  
