@@ -3,7 +3,7 @@ import { toNamedOnion } from '../mappers/onion'
 import type { ApiNamedOnion } from '../types/api'
 import {
   DEFAULT_JS_LAYER_SOURCE,
-  isAuditBuiltin,
+  isAuditLayer,
   layerMetaLabel,
   type NamedOnion,
   type OnionLayer,
@@ -122,7 +122,7 @@ export default function OnionEditor({
 
   const deleteLayer = async (id: string) => {
     const layer = layers.find(l => l.id === id)
-    if (!layer || isAuditBuiltin(layer)) return
+    if (!layer || isAuditLayer(layer)) return
     const previous = layers
     const updated = layers.filter(l => l.id !== id)
     setLayers(updated)
@@ -301,7 +301,7 @@ export default function OnionEditor({
             <button
               type="button"
               onClick={() => void deleteLayer(layer.id)}
-              disabled={isAuditBuiltin(layer)}
+              disabled={isAuditLayer(layer)}
               className="onion-editor__delete-btn"
               aria-label="Delete layer"
             >

@@ -34,22 +34,25 @@ interface EditJsProps {
 
 export type OnionLayerFormProps = AddBuiltinProps | AddJsProps | EditJsProps
 
-export default function OnionLayerForm(props: OnionLayerFormProps): ReactElement {
+function EditJsSource({
+  source,
+  onChange,
+}: Pick<EditJsProps, 'source' | 'onChange'>): ReactElement {
+  return (
+    <textarea
+      value={source}
+      onChange={e => onChange(e.target.value)}
+      className="onion-editor__js-textarea"
+      rows={8}
+      spellCheck={false}
+    />
+  )
+}
+
+function AddLayerForm(props: AddBuiltinProps | AddJsProps): ReactElement {
   const [name, setName] = useState('')
   const [type, setType] = useState<OnionLayerType>('custom')
   const [source, setSource] = useState(JS_LAYER_TEMPLATE)
-
-  if (props.mode === 'edit-js') {
-    return (
-      <textarea
-        value={props.source}
-        onChange={e => props.onChange(e.target.value)}
-        className="onion-editor__js-textarea"
-        rows={8}
-        spellCheck={false}
-      />
-    )
-  }
 
   const submit = () => {
     const trimmed = name.trim()
@@ -123,4 +126,12 @@ export default function OnionLayerForm(props: OnionLayerFormProps): ReactElement
       </div>
     </div>
   )
+}
+
+export default function OnionLayerForm(props: OnionLayerFormProps): ReactElement {
+  if (props.mode === 'edit-js') {
+    return <EditJsSource source={props.source} onChange={props.onChange} />
+  }
+
+  return <AddLayerForm {...props} />
 }

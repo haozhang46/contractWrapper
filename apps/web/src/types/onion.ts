@@ -64,10 +64,6 @@ export function isAuditLayer(layer: OnionLayer): boolean {
   return layer.kind === 'builtin' && layer.type === 'audit'
 }
 
-export function isAuditBuiltin(layer: OnionLayer): boolean {
-  return isAuditLayer(layer)
-}
-
 export function layerMetaLabel(layer: OnionLayer): string {
   if (layer.kind === 'js') {
     return `js · priority ${layer.priority}`
