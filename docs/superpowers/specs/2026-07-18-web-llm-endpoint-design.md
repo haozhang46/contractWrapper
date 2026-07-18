@@ -16,7 +16,7 @@ Chat 走可替换的 Agent Slot（默认 `CcbSlot`）。LLM 真相源是 workspa
 
 - **Endpoint：** Cloud / Local Ollama / Remote Ollama  
 - Local：`baseUrl=http://127.0.0.1:11434/v1`，`apiKey=ollama`，`provider=openai`，拉 tags 选 model  
-- Remote：填 origin（缺 scheme 补 `http://`），可选 key（默认 `ollama`），拉 tags 选 model  
+- Remote：手填 Base URL / Model / API Key；详见 `2026-07-19-web-remote-openai-compat-design.md`  
 - Cloud：现有 Provider / Model / Base URL / API Key 表单  
 
 ### API
