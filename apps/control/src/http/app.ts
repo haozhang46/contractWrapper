@@ -13,6 +13,7 @@ import { createMemoryRoutes } from './routes/memory.ts'
 import { createOnionRoutes } from './routes/onion.ts'
 import { createOnionsRoutes } from './routes/onions.ts'
 import { createPendingRoutes } from './routes/pending.ts'
+import { createSkillFactoryRoutes } from './routes/skill-factory.ts'
 
 export function createApp({
   workspaceRoot,
@@ -40,6 +41,10 @@ export function createApp({
       onionRuntime: onionRegistry,
       pendingStore: pending,
     }),
+  )
+  app.route(
+    '/api/skill-factory',
+    createSkillFactoryRoutes({ workspaceRoot }),
   )
   return app
 }

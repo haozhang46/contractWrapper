@@ -1,7 +1,7 @@
 # Skill Factory Widget Panel — 可沉淀 Widget 注册表 + 人工控制面
 
 **日期：** 2026-07-18  
-**状态：** Draft（待用户审阅 spec 后 Approved）  
+**状态：** Approved（2026-07-18）  
 **宿主：** `harness-console`（`apps/web`、`apps/control`、`packages/widgets`）  
 **依赖：** [2026-07-18-skill-factory-design.md](./2026-07-18-skill-factory-design.md)（MCP 契约与资产约定）；`skill-factory` submodule  
 **范围：** 同仓 widget 注册表、顶栏动态 Tab、Skill Factory 面板（对齐现有 MCP 工具全集）、Control HTTP 薄代理  

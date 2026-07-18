@@ -1,3 +1,6 @@
 [submodule "ccb"]
 	path = ccb
 	url = https://github.com/haozhang46/eee.git
+[submodule "skill-factory"]
+	path = skill-factory
+	url = git@github.com:haozhang46/skill-factory.git
