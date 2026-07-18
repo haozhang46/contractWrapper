@@ -1,4 +1,5 @@
 import { join, resolve } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
 import type {
   AgentSlot,
   SlotEvent,
@@ -36,6 +37,42 @@ export function resolveCcbBridgePath(): string {
   }
   // This file: apps/control/src/slot → monorepo root is ../../../..
   return resolve(import.meta.dir, '../../../../ccb/src/harness/stdioBridge.ts')
+}
+
+/**
+ * Bun -d MACRO.* flags required when running CCB TypeScript directly.
+ * Without these, imports hit `ReferenceError: MACRO is not defined`.
+ */
+export function buildCcbMacroDefineArgs(bridgePath: string): string[] {
+  // bridge: ccb/src/harness/stdioBridge.ts → ccb/
+  const ccbRoot = resolve(bridgePath, '../../..')
+  let version = '0.0.0'
+  try {
+    const pkgPath = join(ccbRoot, 'package.json')
+    if (existsSync(pkgPath)) {
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as {
+        version?: string
+      }
+      if (pkg.version) version = pkg.version
+    }
+  } catch {
+    // keep fallback version
+  }
+  const defines: Record<string, string> = {
+    'MACRO.VERSION': JSON.stringify(version),
+    'MACRO.BUILD_TIME': JSON.stringify(new Date().toISOString()),
+    'MACRO.FEEDBACK_CHANNEL': JSON.stringify(''),
+    'MACRO.ISSUES_EXPLAINER': JSON.stringify(''),
+    'MACRO.NATIVE_PACKAGE_URL': JSON.stringify(''),
+    'MACRO.PACKAGE_URL': JSON.stringify(''),
+    'MACRO.VERSION_CHANGELOG': JSON.stringify(''),
+    'process.env.NODE_ENV': JSON.stringify('production'),
+  }
+  return Object.entries(defines).flatMap(([k, v]) => ['-d', `${k}:${v}`])
+}
+
+export function defaultCcbBridgeSpawnArgs(bridgePath: string): string[] {
+  return [...buildCcbMacroDefineArgs(bridgePath), bridgePath]
 }
 
 function defaultEnv(workspaceRoot: string): Record<string, string> {
@@ -279,8 +316,9 @@ export class CcbSlot implements AgentSlot {
     }
 
     const command = this.opts.spawnCommand ?? process.execPath
+    const bridgePath = resolveCcbBridgePath()
     const args =
-      this.opts.spawnArgs ?? [resolveCcbBridgePath()]
+      this.opts.spawnArgs ?? defaultCcbBridgeSpawnArgs(bridgePath)
     const cwd = this.opts.cwd ?? workspaceRoot
     const env: Record<string, string | undefined> = {
       ...process.env,

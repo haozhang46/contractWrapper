@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { SlotEvent } from '@harness/slot'
-import { CcbSlot, resolveCcbBridgePath } from '../ccb-slot.ts'
+import { CcbSlot, defaultCcbBridgeSpawnArgs, resolveCcbBridgePath } from '../ccb-slot.ts'
 import { getDefaultSlot } from '../factory.ts'
 import { encodeJsonl, parseJsonlLine } from '../jsonl.ts'
 
@@ -59,6 +59,16 @@ describe('CcbSlot', () => {
     } finally {
       process.chdir(prev)
     }
+  })
+
+  test('defaultCcbBridgeSpawnArgs injects MACRO -d flags', () => {
+    const bridge = resolveCcbBridgePath()
+    const args = defaultCcbBridgeSpawnArgs(bridge)
+    expect(args).toContain('-d')
+    const versionArg = args.find(a => a.startsWith('MACRO.VERSION:'))
+    expect(versionArg).toBeTruthy()
+    expect(versionArg).toContain('2.')
+    expect(args.at(-1)).toBe(bridge)
   })
 
   test('CcbSlot turn over stdio', async () => {
