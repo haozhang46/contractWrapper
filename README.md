@@ -38,6 +38,12 @@ bun run web:dev       # :5173 → proxy /api → :3100
 ./scripts/acceptance-separation.sh
 ```
 
+## Skill Factory
+
+git submodule [`skill-factory/`](./skill-factory/) → [haozhang46/skill-factory](https://github.com/haozhang46/skill-factory)（约定驱动 Skill 生产与评测；嵌套 `skill-assets`）。
+
+挂载与 MCP 接入见 [Skill Factory 挂载](./docs/skill-factory-submodule.md)。
+
 ## 文档
 
 - [北极星架构](./docs/superpowers/specs/2026-07-17-harness-control-console-north-star-design.md)
