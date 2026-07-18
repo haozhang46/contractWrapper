@@ -1,13 +1,14 @@
 import { Component, useState, type ReactElement, type ReactNode } from 'react'
+import { listWidgets } from '@harness/widgets'
 import ChatPanel from './components/ChatPanel'
 import ConfirmBanner from './components/ConfirmBanner'
 import SettingsPanel from './components/SettingsPanel'
 import { captureComponentError } from './monitoring/error-reporting'
-
-type Tab = 'chat' | 'settings'
+import { type ShellTab } from './shellTabs'
 
 export default function App(): ReactElement {
-  const [activeTab, setActiveTab] = useState<Tab>('chat')
+  const [activeTab, setActiveTab] = useState<ShellTab>('chat')
+  const widgets = listWidgets()
 
   return (
     <ErrorBoundary>
@@ -27,11 +28,26 @@ export default function App(): ReactElement {
             >
               Settings
             </TabButton>
+            {widgets.map((widget) => (
+              <TabButton
+                key={widget.id}
+                active={activeTab === widget.id}
+                onClick={() => setActiveTab(widget.id)}
+              >
+                {widget.title}
+              </TabButton>
+            ))}
           </nav>
         </header>
 
         <main className="shell__main">
-          {activeTab === 'chat' ? <ChatPanel /> : <SettingsPanel />}
+          {activeTab === 'chat' ? (
+            <ChatPanel />
+          ) : activeTab === 'settings' ? (
+            <SettingsPanel />
+          ) : (
+            widgets.find((widget) => widget.id === activeTab)?.mount() ?? null
+          )}
         </main>
         <ConfirmBanner />
       </div>

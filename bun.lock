@@ -24,6 +24,7 @@
       "name": "@harness/web",
       "version": "0.0.1",
       "dependencies": {
+        "@harness/widgets": "workspace:*",
         "@headlessui/react": "^2.2.0",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
