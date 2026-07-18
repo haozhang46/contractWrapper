@@ -56,15 +56,19 @@ function migrateLegacyContract(workspaceRoot: string): NamedOnion | null {
     return null
   }
 
-  const raw = JSON.parse(readFileSync(legacyPath, 'utf-8')) as ContractOnion
-  const onion: NamedOnion = {
-    version: 1,
-    id: 'default',
-    name: 'Default',
-    layers: (raw.layers ?? []).map(toBuiltinLayer),
+  try {
+    const raw = JSON.parse(readFileSync(legacyPath, 'utf-8')) as ContractOnion
+    const onion: NamedOnion = {
+      version: 1,
+      id: 'default',
+      name: 'Default',
+      layers: (raw.layers ?? []).map(toBuiltinLayer),
+    }
+    writeFileSync(defaultPath, JSON.stringify(onion, null, 2))
+    return onion
+  } catch {
+    return null
   }
-  writeFileSync(defaultPath, JSON.stringify(onion, null, 2))
-  return onion
 }
 
 function parseNamedOnion(raw: unknown): NamedOnion | null {
@@ -84,9 +88,14 @@ export class OnionRegistry {
   private readonly workspaceRoot: string
   private readonly onions = new Map<string, NamedOnion>()
   private readonly runtimes = new Map<string, OnionRuntime>()
+  private defaultCorrupt = false
 
   constructor(workspaceRoot: string) {
     this.workspaceRoot = workspaceRoot
+  }
+
+  isDefaultCorrupt(): boolean {
+    return this.defaultCorrupt
   }
 
   bootstrap(): void {
@@ -95,21 +104,35 @@ export class OnionRegistry {
 
     this.onions.clear()
     this.runtimes.clear()
+    this.defaultCorrupt = false
 
     const dir = onionsDir(this.workspaceRoot)
+    const defaultPath = onionPath(this.workspaceRoot, 'default')
+    const defaultFileExists = existsSync(defaultPath)
+
     for (const file of readdirSync(dir)) {
       if (!file.endsWith('.json')) continue
       try {
         const raw = JSON.parse(readFileSync(join(dir, file), 'utf-8'))
         const onion = parseNamedOnion(raw)
-        if (!onion) continue
+        if (!onion) {
+          if (file === 'default.json') {
+            this.defaultCorrupt = true
+          }
+          continue
+        }
         this.loadOnion(onion)
       } catch {
-        // skip corrupt files
+        if (file === 'default.json') {
+          this.defaultCorrupt = true
+        }
       }
     }
 
     if (!this.onions.has('default')) {
+      if (defaultFileExists && this.defaultCorrupt) {
+        return
+      }
       const def = defaultNamedOnion()
       this.writeOnionFile(def)
       this.loadOnion(def)
@@ -157,6 +180,10 @@ export class OnionRegistry {
     opts?: { onionId?: string },
   ): Promise<EvaluateResult> {
     const requested = opts?.onionId?.trim() || 'default'
+    if (this.defaultCorrupt) {
+      return this.denyCorruptDefault(toolName, requested)
+    }
+
     let unknownFallback = false
     let runtime = this.runtimes.get(requested)
     if (!runtime) {
@@ -186,6 +213,30 @@ export class OnionRegistry {
       ]
     }
     return result
+  }
+
+  private denyCorruptDefault(
+    toolName: string,
+    requested: string,
+  ): EvaluateResult {
+    const detail =
+      requested === 'default'
+        ? 'default onion config is corrupt; fix .harness/onions/default.json'
+        : `unknown onionId ${requested} and default onion config is corrupt`
+    return {
+      decision: 'deny',
+      message: detail,
+      auditTrail: [
+        {
+          timestamp: new Date().toISOString(),
+          layerId: 'registry',
+          layerType: 'custom',
+          toolName,
+          decision: 'deny',
+          detail,
+        },
+      ],
+    }
   }
 
   private loadOnion(onion: NamedOnion): void {

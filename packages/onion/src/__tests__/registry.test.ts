@@ -93,4 +93,45 @@ describe('OnionRegistry', () => {
       }),
     ).toThrow()
   })
+
+  test('bootstrap does not overwrite corrupt default.json', () => {
+    const corrupt = '{not valid json'
+    mkdirSync(join(root, '.harness/onions'), { recursive: true })
+    writeFileSync(join(root, '.harness/onions/default.json'), corrupt)
+    const reg = new OnionRegistry(root)
+    reg.bootstrap()
+    expect(readFileSync(join(root, '.harness/onions/default.json'), 'utf-8')).toBe(corrupt)
+    expect(reg.isDefaultCorrupt()).toBe(true)
+    expect(reg.get('default')).toBeNull()
+  })
+
+  test('evaluate denies when default onion config is corrupt', async () => {
+    mkdirSync(join(root, '.harness/onions'), { recursive: true })
+    writeFileSync(join(root, '.harness/onions/default.json'), '{not valid json')
+    const reg = new OnionRegistry(root)
+    reg.bootstrap()
+    const d = await reg.evaluate('Read', { path: 'x' })
+    expect(d.decision).toBe('deny')
+    expect(d.message).toMatch(/corrupt/i)
+  })
+
+  test('bootstrap tolerates corrupt contract-onion.json', () => {
+    writeFileSync(join(root, '.harness/contract-onion.json'), '{not valid json')
+    const reg = new OnionRegistry(root)
+    expect(() => reg.bootstrap()).not.toThrow()
+    expect(existsSync(join(root, '.harness/onions/default.json'))).toBe(true)
+    expect(reg.get('default')).not.toBeNull()
+    expect(reg.isDefaultCorrupt()).toBe(false)
+  })
+
+  test('corrupt contract-onion.json does not overwrite corrupt default.json', () => {
+    const corrupt = '{broken default'
+    mkdirSync(join(root, '.harness/onions'), { recursive: true })
+    writeFileSync(join(root, '.harness/onions/default.json'), corrupt)
+    writeFileSync(join(root, '.harness/contract-onion.json'), '{broken legacy')
+    const reg = new OnionRegistry(root)
+    reg.bootstrap()
+    expect(readFileSync(join(root, '.harness/onions/default.json'), 'utf-8')).toBe(corrupt)
+    expect(reg.isDefaultCorrupt()).toBe(true)
+  })
 })
