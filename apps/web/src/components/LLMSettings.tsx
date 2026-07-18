@@ -251,7 +251,7 @@ export default function LLMSettings(): ReactElement {
               onChange={e =>
                 setSettings({ ...settings, baseUrl: e.target.value })
               }
-              placeholder="http://192.168.1.10:11434/v1"
+              placeholder="http://192.168.1.7:8080/v1/chat/completions"
               className="form-field__input"
             />
           </div>

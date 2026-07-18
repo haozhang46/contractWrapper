@@ -1,9 +1,15 @@
 import { Hono } from 'hono'
 import {
+  applyOpenAiEndpointToClaudeSettings,
+  restoreCloudEndpointToClaudeSettings,
+} from '../../llm/claudeUserSettings.ts'
+import { normalizeOpenAiBaseUrl } from '../../llm/normalizeOpenAiBaseUrl.ts'
+import {
   fetchOllamaModelNames,
   loadLLMSettings,
   LOCAL_OLLAMA_ORIGIN,
   saveLLMSettings,
+  type EndpointMode,
   type LLMSettings,
 } from '../../llm/settings.ts'
 import {
@@ -11,6 +17,18 @@ import {
   isOllamaReachable,
 } from '../../llm/ollamaRuntime.ts'
 import { bounceDefaultSlot } from '../../slot/factory.ts'
+
+function shouldNormalizeBaseUrl(
+  baseUrl: string,
+  provider: string,
+  endpointMode: EndpointMode,
+): boolean {
+  if (!baseUrl.trim()) return false
+  if (endpointMode === 'ollama-local' || endpointMode === 'ollama-remote') {
+    return true
+  }
+  return provider === 'openai'
+}
 
 export function createLlmRoutes(workspaceRoot: string): Hono {
   const api = new Hono()
@@ -21,15 +39,46 @@ export function createLlmRoutes(workspaceRoot: string): Hono {
 
   api.put('/', async c => {
     const body = await c.req.json<Partial<LLMSettings>>()
+    const provider = body.provider ?? 'openai'
+    const endpointMode = body.endpointMode ?? 'cloud'
+    const rawBaseUrl = body.baseUrl ?? ''
+
+    let baseUrl = rawBaseUrl
+    if (shouldNormalizeBaseUrl(rawBaseUrl, provider, endpointMode)) {
+      try {
+        baseUrl = normalizeOpenAiBaseUrl(rawBaseUrl)
+      } catch (e) {
+        return c.json(
+          { error: e instanceof Error ? e.message : String(e) },
+          400,
+        )
+      }
+    }
+
     const saved = saveLLMSettings(workspaceRoot, {
-      provider: body.provider ?? 'openai',
+      provider,
       model: body.model ?? '',
-      baseUrl: body.baseUrl ?? '',
+      baseUrl,
       apiKey: body.apiKey ?? '',
-      endpointMode: body.endpointMode,
+      endpointMode,
     })
+
+    let warning: string | undefined
+    if (endpointMode === 'ollama-local' || endpointMode === 'ollama-remote') {
+      const result = applyOpenAiEndpointToClaudeSettings({
+        endpointMode,
+        baseUrl: saved.baseUrl,
+        model: saved.model,
+        apiKey: saved.apiKey,
+      })
+      if (!result.ok) warning = result.warning
+    } else if (endpointMode === 'cloud') {
+      const result = restoreCloudEndpointToClaudeSettings()
+      if (!result.ok) warning = result.warning
+    }
+
     bounceDefaultSlot()
-    return c.json(saved)
+    return c.json(warning ? { ...saved, warning } : saved)
   })
 
   api.get('/ollama/status', async c => {
