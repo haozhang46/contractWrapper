@@ -34,13 +34,34 @@ export interface ApiOnionResponse {
   layers?: ApiOnionLayer[]
 }
 
+export interface ApiOnionsListResponse {
+  onions?: ApiOnionListItem[]
+}
+
+export interface ApiOnionListItem {
+  id: string
+  name: string
+  layerCount: number
+  isDefault: boolean
+}
+
+export interface ApiNamedOnion {
+  version?: number
+  id: string
+  name: string
+  layers?: ApiOnionLayer[]
+  error?: string
+}
+
 export interface ApiOnionLayer {
   id: string
-  type: string
   name: string
   enabled: boolean
   priority: number
+  kind?: 'builtin' | 'js'
+  type?: string
   config?: Record<string, unknown>
+  source?: string
 }
 
 export interface ApiLLMSettings {

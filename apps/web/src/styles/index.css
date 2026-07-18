@@ -376,14 +376,98 @@
 }
 
 /* ============================================================
+   Onions Panel
+   ============================================================ */
+.onions-panel {
+  @apply space-y-3;
+}
+
+.onions-panel__error,
+.onion-editor__error {
+  @apply text-red-400 text-sm;
+}
+
+.onions-panel__list {
+  @apply space-y-2 list-none p-0 m-0;
+}
+
+.onions-panel__item {
+  @apply flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800/50;
+}
+
+.onions-panel__item-main {
+  @apply flex-1 min-w-0 text-left px-3 py-2.5 hover:bg-zinc-800 transition-colors rounded-lg;
+}
+
+.onions-panel__item-name {
+  @apply block text-sm font-medium text-zinc-100 truncate;
+}
+
+.onions-panel__item-meta {
+  @apply block text-xs text-zinc-500 mt-0.5 truncate;
+}
+
+.onions-panel__delete-btn {
+  @apply text-xs text-zinc-500 hover:text-red-400 px-3 py-2 shrink-0;
+
+  &:disabled {
+    @apply opacity-30 cursor-not-allowed hover:text-zinc-500;
+  }
+}
+
+.onions-panel__empty {
+  @apply text-zinc-500 text-sm;
+}
+
+.onions-panel__new-btn,
+.onion-editor__add-btn,
+.onion-editor__back-btn,
+.onion-editor__edit-btn,
+.onions-panel__cancel-btn {
+  @apply text-sm text-zinc-300 hover:text-zinc-100 px-3 py-1.5 rounded-lg border border-zinc-700 bg-zinc-800/50 transition-colors;
+
+  &:disabled {
+    @apply opacity-50;
+  }
+}
+
+.onions-panel__new-form {
+  @apply space-y-3 p-3 rounded-lg border border-zinc-700 bg-zinc-800/30;
+}
+
+.onions-panel__new-actions {
+  @apply flex items-center gap-2;
+}
+
+/* ============================================================
    Onion Editor
    ============================================================ */
 .onion-editor {
   @apply space-y-2;
 }
 
+.onion-editor__header {
+  @apply flex items-center gap-3 mb-2;
+}
+
+.onion-editor__onion-id {
+  @apply text-xs text-zinc-500 font-mono;
+}
+
+.onion-editor__name-row {
+  @apply mb-3;
+}
+
+.onion-editor__name-controls {
+  @apply flex items-center gap-2;
+}
+
 .onion-editor__empty {
   @apply text-red-400 text-sm;
+}
+
+.onion-editor__layer-block {
+  @apply space-y-2;
 }
 
 .onion-editor__layer {
@@ -426,8 +510,191 @@
   }
 }
 
+.onion-editor__js-editor {
+  @apply space-y-2 pl-3 border-l-2 border-zinc-700;
+}
+
+.onion-editor__js-textarea {
+  @apply w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-xs text-zinc-100 font-mono leading-relaxed;
+
+  &:focus {
+    @apply outline-none border-orange-500/50;
+  }
+}
+
+.onion-editor__add {
+  @apply flex flex-wrap items-center gap-2 pt-2;
+}
+
+.onion-editor__add-builtin {
+  @apply flex items-center gap-2 flex-1 min-w-[12rem];
+}
+
 .onion-editor__saving {
   @apply text-xs text-zinc-500;
+}
+
+.onion-editor__error {
+  @apply text-xs text-red-400;
+}
+
+.onion-editor__layer-block {
+  @apply space-y-2;
+}
+
+.onion-editor__js-panel {
+  @apply space-y-2 pl-3 border-l-2 border-zinc-700;
+}
+
+.onion-editor__js-textarea {
+  @apply w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-xs text-zinc-100 font-mono;
+
+  &:focus {
+    @apply outline-none border-orange-500/50;
+  }
+}
+
+.onion-editor__add-form {
+  @apply space-y-3 p-3 rounded-lg border border-zinc-700 bg-zinc-800/30;
+}
+
+.onion-editor__add-actions {
+  @apply flex flex-wrap gap-2;
+}
+
+.onion-editor__cancel-btn {
+  @apply px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors;
+}
+
+.onion-editor__edit-btn {
+  @apply text-xs text-orange-400 hover:text-orange-300 px-2;
+}
+
+.onion-editor__back-btn {
+  @apply text-sm text-zinc-400 hover:text-zinc-200 transition-colors;
+}
+
+.onion-editor__header {
+  @apply flex items-center justify-between gap-3;
+}
+
+.onion-editor__onion-id {
+  @apply text-xs text-zinc-500 font-mono;
+}
+
+.onion-editor__name-row {
+  @apply space-y-1;
+}
+
+.onion-editor__name-controls {
+  @apply flex flex-wrap items-center gap-2;
+}
+
+.onion-editor__js-editor {
+  @apply space-y-2 pl-3 border-l-2 border-zinc-700;
+}
+
+.onion-editor__add {
+  @apply flex flex-wrap items-center gap-3 pt-2;
+}
+
+.onion-editor__add-builtin {
+  @apply flex flex-wrap items-center gap-2;
+}
+
+.onion-editor__add-btn {
+  @apply px-3 py-1.5 text-sm bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-zinc-200 transition-colors;
+
+  &:disabled {
+    @apply opacity-50;
+  }
+}
+
+/* ============================================================
+   Onions Panel
+   ============================================================ */
+.onions-panel {
+  @apply space-y-4;
+}
+
+.onions-panel__header {
+  @apply flex items-center justify-between gap-3;
+}
+
+.onions-panel__count {
+  @apply text-xs text-zinc-500;
+}
+
+.onions-panel__new-form {
+  @apply space-y-3 p-3 rounded-lg border border-zinc-700 bg-zinc-800/30;
+}
+
+.onions-panel__new-actions {
+  @apply flex flex-wrap gap-2;
+}
+
+.onions-panel__list {
+  @apply space-y-1;
+}
+
+.onions-panel__item {
+  @apply flex items-center gap-2 rounded-lg border border-zinc-800;
+}
+
+.onions-panel__item--selected {
+  @apply border-orange-500/40 bg-zinc-800/40;
+}
+
+.onions-panel__select {
+  @apply flex-1 min-w-0 text-left p-3;
+}
+
+.onions-panel__name {
+  @apply block text-sm font-medium truncate;
+}
+
+.onions-panel__meta {
+  @apply block text-xs text-zinc-500 truncate;
+}
+
+.onions-panel__editor {
+  @apply pt-4 border-t border-zinc-800;
+}
+
+.onions-panel__error {
+  @apply text-xs text-red-400;
+}
+
+.onions-panel__item-main {
+  @apply flex-1 min-w-0 text-left p-3;
+}
+
+.onions-panel__item-name {
+  @apply block text-sm font-medium truncate;
+}
+
+.onions-panel__item-meta {
+  @apply block text-xs text-zinc-500 truncate;
+}
+
+.onions-panel__delete-btn {
+  @apply px-3 py-2 text-xs text-zinc-500 hover:text-red-400 shrink-0;
+
+  &:disabled {
+    @apply opacity-30 cursor-not-allowed;
+  }
+}
+
+.onions-panel__empty {
+  @apply text-xs text-zinc-600;
+}
+
+.onions-panel__new-btn {
+  @apply px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-sm rounded-lg transition-colors;
+}
+
+.onions-panel__cancel-btn {
+  @apply px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors;
 }
 
 /* ============================================================

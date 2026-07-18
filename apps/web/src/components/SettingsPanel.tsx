@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import HeadlessSettings from './HeadlessSettings'
 import LLMSettings from './LLMSettings'
 import MemorySettings from './MemorySettings'
-import OnionEditor from './OnionEditor'
+import OnionsPanel from './OnionsPanel'
 
 export default function SettingsPanel(): ReactElement {
   return (
@@ -27,8 +27,8 @@ export default function SettingsPanel(): ReactElement {
       </section>
 
       <section className="settings__section">
-        <h3 className="settings__section-title">Contract Onion</h3>
-        <OnionEditor />
+        <h3 className="settings__section-title">Onions</h3>
+        <OnionsPanel />
       </section>
     </div>
   )
