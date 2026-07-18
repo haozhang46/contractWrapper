@@ -11,6 +11,7 @@ export interface AuditEntry {
   toolName: string
   decision: LayerDecision
   reason?: string
+  detail?: string
 }
 
 export interface OnionEvaluateContext {
