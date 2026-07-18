@@ -13,6 +13,7 @@ import { createMemoryRoutes } from './routes/memory.ts'
 import { createOnionRoutes } from './routes/onion.ts'
 import { createOnionsRoutes } from './routes/onions.ts'
 import { createPendingRoutes } from './routes/pending.ts'
+import { createLlmRoutes } from './routes/llm.ts'
 import { createSkillFactoryRoutes } from './routes/skill-factory.ts'
 
 export function createApp({
@@ -28,6 +29,7 @@ export function createApp({
   app.route('/api/chat', createChatRoutes(workspaceRoot))
   app.route('/api/chat-sessions', createChatSessionsRoutes(workspaceRoot))
   app.route('/api/memory', createMemoryRoutes(workspaceRoot))
+  app.route('/api/llm', createLlmRoutes(workspaceRoot))
   app.route('/api/onion', createOnionRoutes(workspaceRoot))
   app.route('/api/onions', createOnionsRoutes())
   app.route('/api/charter', createCharterRoutes(workspaceRoot))

@@ -64,11 +64,14 @@ export interface ApiOnionLayer {
   source?: string
 }
 
+export type EndpointMode = 'cloud' | 'ollama-local' | 'ollama-remote'
+
 export interface ApiLLMSettings {
   provider: string
   model: string
   baseUrl: string
   apiKey: string
+  endpointMode?: EndpointMode
 }
 
 export interface ApiMemoryResponse {
