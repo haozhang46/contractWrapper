@@ -35,6 +35,10 @@ interface EditJsProps {
 export type OnionLayerFormProps = AddBuiltinProps | AddJsProps | EditJsProps
 
 export default function OnionLayerForm(props: OnionLayerFormProps): ReactElement {
+  const [name, setName] = useState('')
+  const [type, setType] = useState<OnionLayerType>('custom')
+  const [source, setSource] = useState(JS_LAYER_TEMPLATE)
+
   if (props.mode === 'edit-js') {
     return (
       <textarea
@@ -46,10 +50,6 @@ export default function OnionLayerForm(props: OnionLayerFormProps): ReactElement
       />
     )
   }
-
-  const [name, setName] = useState('')
-  const [type, setType] = useState<OnionLayerType>('custom')
-  const [source, setSource] = useState(JS_LAYER_TEMPLATE)
 
   const submit = () => {
     const trimmed = name.trim()
