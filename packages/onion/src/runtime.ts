@@ -1,9 +1,15 @@
-import type { ContractOnion, OnionLayerConfig } from '@harness/protocol'
+import type {
+  ContractOnion,
+  NamedOnion,
+  OnionLayer,
+  OnionLayerConfig,
+} from '@harness/protocol'
+import { toBuiltinLayer } from '@harness/protocol'
+import { compileJsLayer } from './compileJsLayer.ts'
 import { DEFAULT_ONION_LAYERS } from './defaultLayers.ts'
 import type {
   AuditEntry,
   EvaluateResult,
-  LayerDecision,
   OnionEvaluateContext,
   OnionMiddleware,
 } from './types.ts'
@@ -31,15 +37,42 @@ function compose(middlewares: OnionMiddleware[]): OnionMiddleware {
   }
 }
 
+function isBuiltinAudit(layer: OnionLayer): boolean {
+  return layer.kind === 'builtin' && layer.type === 'audit'
+}
+
+function isNonAuditLayer(layer: OnionLayer): boolean {
+  return layer.kind === 'js' || (layer.kind === 'builtin' && layer.type !== 'audit')
+}
+
+function toLegacyConfig(layer: OnionLayer): OnionLayerConfig {
+  if (layer.kind !== 'builtin') {
+    throw new Error(`Cannot convert ${layer.kind} layer to OnionLayerConfig`)
+  }
+  return {
+    id: layer.id,
+    type: layer.type,
+    name: layer.name,
+    enabled: layer.enabled,
+    priority: layer.priority,
+    config: layer.config,
+  }
+}
+
 export class OnionRuntime {
-  private layers: OnionLayerConfig[] = []
+  private layers: OnionLayer[] = []
   private middlewares: OnionMiddleware[] = []
   private initialized = false
 
   load(contract: ContractOnion | null): void {
     const raw = contract?.layers?.length
-      ? contract.layers
+      ? contract.layers.map(toBuiltinLayer)
       : DEFAULT_ONION_LAYERS
+    this.applyLayers(raw)
+  }
+
+  loadNamed(onion: NamedOnion | null): void {
+    const raw = onion?.layers?.length ? onion.layers : DEFAULT_ONION_LAYERS
     this.applyLayers(raw)
   }
 
@@ -77,28 +110,31 @@ export class OnionRuntime {
     }
   }
 
-  getLayers(): OnionLayerConfig[] {
+  getLayers(): OnionLayer[] {
     return this.layers
   }
 
   updateLayers(layers: OnionLayerConfig[]): void {
-    this.applyLayers(layers)
+    this.applyLayers(layers.map(toBuiltinLayer))
   }
 
   toContract(): ContractOnion {
     return {
       version: 1,
-      layers: this.layers,
+      layers: this.layers
+        .filter((l): l is Extract<OnionLayer, { kind: 'builtin' }> => l.kind === 'builtin')
+        .map(toLegacyConfig),
     }
   }
 
-  private applyLayers(raw: OnionLayerConfig[]): void {
-    const hasAudit = raw.some(l => l.type === 'audit' && l.enabled)
+  private applyLayers(raw: OnionLayer[]): void {
+    const hasAudit = raw.some(l => isBuiltinAudit(l) && l.enabled)
     this.layers = hasAudit
       ? [...raw].sort((a, b) => a.priority - b.priority)
-      : [...DEFAULT_ONION_LAYERS.filter(l => l.type === 'audit'), ...raw].sort(
-          (a, b) => a.priority - b.priority,
-        )
+      : [
+          ...DEFAULT_ONION_LAYERS.filter(isBuiltinAudit),
+          ...raw,
+        ].sort((a, b) => a.priority - b.priority)
 
     this.rebuildMiddlewares()
     this.initialized = true
@@ -106,7 +142,7 @@ export class OnionRuntime {
 
   private rebuildMiddlewares(): void {
     const enabled = this.layers.filter(l => l.enabled)
-    const nonAuditEnabled = enabled.filter(l => l.type !== 'audit')
+    const nonAuditEnabled = enabled.filter(isNonAuditLayer)
     if (nonAuditEnabled.length === 0) {
       this.middlewares = [this.createDenyAllMiddleware()]
     } else {
@@ -114,7 +150,11 @@ export class OnionRuntime {
     }
   }
 
-  private layerToMiddleware(layer: OnionLayerConfig): OnionMiddleware {
+  private layerToMiddleware(layer: OnionLayer): OnionMiddleware {
+    if (layer.kind === 'js') {
+      return this.createJsMiddleware(layer)
+    }
+
     switch (layer.type) {
       case 'audit':
         return this.createAuditMiddleware(layer)
@@ -129,7 +169,32 @@ export class OnionRuntime {
     }
   }
 
-  private createAuditMiddleware(layer: OnionLayerConfig): OnionMiddleware {
+  private createJsMiddleware(
+    layer: Extract<OnionLayer, { kind: 'js' }>,
+  ): OnionMiddleware {
+    return async (ctx, next) => {
+      try {
+        const mw = compileJsLayer(layer.source)
+        await mw(ctx, next)
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        ctx.decision = 'deny'
+        ctx.message = message
+        ctx.auditTrail.push({
+          timestamp: new Date().toISOString(),
+          layerId: layer.id,
+          layerType: 'custom',
+          toolName: ctx.toolName,
+          decision: 'deny',
+          reason: message,
+        })
+      }
+    }
+  }
+
+  private createAuditMiddleware(
+    layer: Extract<OnionLayer, { kind: 'builtin' }>,
+  ): OnionMiddleware {
     return async (ctx, next) => {
       const entry: AuditEntry = {
         timestamp: new Date().toISOString(),
@@ -146,7 +211,7 @@ export class OnionRuntime {
   }
 
   private createCapabilityGateMiddleware(
-    _layer: OnionLayerConfig,
+    _layer: Extract<OnionLayer, { kind: 'builtin' }>,
   ): OnionMiddleware {
     return async (ctx, next) => {
       const toolCapabilityLevel = this.classifyToolCapability(ctx.toolName)
@@ -167,7 +232,7 @@ export class OnionRuntime {
   }
 
   private createRequireConfirmMiddleware(
-    layer: OnionLayerConfig,
+    layer: Extract<OnionLayer, { kind: 'builtin' }>,
   ): OnionMiddleware {
     return async (ctx, next) => {
       const tools = layer.config.tools as string[] | undefined
