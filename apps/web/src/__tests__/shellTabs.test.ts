@@ -13,6 +13,7 @@ describe('shellTabs', () => {
   test('isFixedTab identifies fixed tabs only', () => {
     expect(isFixedTab('chat')).toBe(true)
     expect(isFixedTab('settings')).toBe(true)
+    expect(isFixedTab('skills')).toBe(true)
     expect(isFixedTab('skill-factory')).toBe(false)
   })
 })

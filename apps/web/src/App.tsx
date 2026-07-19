@@ -3,6 +3,7 @@ import { listWidgets } from '@harness/widgets'
 import ChatPanel from './components/ChatPanel'
 import ConfirmBanner from './components/ConfirmBanner'
 import SettingsPanel from './components/SettingsPanel'
+import SkillsPanel from './components/SkillsPanel'
 import { captureComponentError } from './monitoring/error-reporting'
 import { type ShellTab } from './shellTabs'
 
@@ -28,6 +29,12 @@ export default function App(): ReactElement {
             >
               Settings
             </TabButton>
+            <TabButton
+              active={activeTab === 'skills'}
+              onClick={() => setActiveTab('skills')}
+            >
+              Skills
+            </TabButton>
             {widgets.map((widget) => (
               <TabButton
                 key={widget.id}
@@ -45,6 +52,8 @@ export default function App(): ReactElement {
             <ChatPanel />
           ) : activeTab === 'settings' ? (
             <SettingsPanel />
+          ) : activeTab === 'skills' ? (
+            <SkillsPanel />
           ) : (
             widgets.find((widget) => widget.id === activeTab)?.mount() ?? null
           )}
