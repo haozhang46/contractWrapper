@@ -4,3 +4,6 @@
 [submodule "skill-factory"]
 	path = skill-factory
 	url = git@github.com:haozhang46/skill-factory.git
+[submodule "libs/harness-headless-connect"]
+	path = libs/harness-headless-connect
+	url = https://github.com/haozhang46/harness-headless-connect.git
