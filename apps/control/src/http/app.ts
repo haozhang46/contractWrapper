@@ -8,11 +8,13 @@ import { createChatRoutes } from './routes/chat.ts'
 import { createChatSessionsRoutes } from './routes/chat-sessions.ts'
 import { createCharterRoutes } from './routes/charter.ts'
 import { createConfirmRoutes } from './routes/confirm.ts'
+import { createHeadlessPagesRoutes } from './routes/headless-pages.ts'
 import { createHeadlessRoutes } from './routes/headless.ts'
 import { createMemoryRoutes } from './routes/memory.ts'
 import { createOnionRoutes } from './routes/onion.ts'
 import { createPendingRoutes } from './routes/pending.ts'
 import { createSkillFactoryRoutes } from './routes/skill-factory.ts'
+import { createMcpRoutes } from './routes/mcp.ts'
 import { createSkillsRoutes } from './routes/skills.ts'
 
 export function createApp({
@@ -25,12 +27,14 @@ export function createApp({
   loadOnion(workspaceRoot)
 
   const app = new Hono()
+  app.get('/api/health', c => c.json({ ok: true }))
   app.route('/api/chat', createChatRoutes(workspaceRoot))
   app.route('/api/chat-sessions', createChatSessionsRoutes(workspaceRoot))
   app.route('/api/memory', createMemoryRoutes(workspaceRoot))
   app.route('/api/onion', createOnionRoutes(workspaceRoot))
   app.route('/api/charter', createCharterRoutes(workspaceRoot))
   app.route('/api/headless', createHeadlessRoutes(workspaceRoot))
+  app.route('/api/headless', createHeadlessPagesRoutes(workspaceRoot))
   app.route('/api/pending', createPendingRoutes(pending))
   app.route('/api/confirm', createConfirmRoutes(pending))
   app.route(
@@ -45,6 +49,7 @@ export function createApp({
     '/api/skill-factory',
     createSkillFactoryRoutes({ workspaceRoot }),
   )
+  app.route('/api/mcp', createMcpRoutes(workspaceRoot))
   app.route('/api/skills', createSkillsRoutes({ workspaceRoot }))
   return app
 }
