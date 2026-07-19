@@ -9,11 +9,11 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { loadRegistry } from '../registry.ts'
 import {
   disableSkill,
   enableSkill,
   listSkills,
-  SkillConflictError,
 } from '../service.ts'
 import type { FactoryTools } from '../types.ts'
 
@@ -173,8 +173,38 @@ describe('enableSkill / disableSkill', () => {
       }),
     }
 
-    expect(
+    await expect(
       enableSkill(root, 'dup', { source: 'factory', zone: 'published' }, factory),
-    ).rejects.toBeInstanceOf(SkillConflictError)
+    ).rejects.toMatchObject({ code: 'CONFLICT' })
+  })
+
+  test('disable clears enabled on all registry entries for id', async () => {
+    const root = makeWorkspace()
+    writeRuntimeSkill(root, 'dup', '# Runtime dup\n')
+
+    const factory: FactoryTools = {
+      assetsRoot: '/virtual-assets',
+      skillList: () => [{ id: 'dup', zone: 'published' }],
+      skillGet: (_assetsRoot, id, zone) => ({
+        id,
+        zone: zone ?? 'published',
+        skillMd: '# Factory dup\n',
+      }),
+    }
+
+    await enableSkill(root, 'dup', { source: 'runtime' })
+    await disableSkill(root, 'dup')
+    await enableSkill(root, 'dup', { source: 'factory', zone: 'published' }, factory)
+
+    const item = await disableSkill(root, 'dup')
+
+    expect(item.enabled).toBe(false)
+    expect(item.installed).toBe(false)
+    expect(existsSync(join(root, '.claude', 'skills', 'dup'))).toBe(false)
+
+    const registry = loadRegistry(root)
+    const entries = registry.entries.filter((e) => e.id === 'dup')
+    expect(entries.length).toBeGreaterThan(0)
+    expect(entries.every((e) => e.enabled === false)).toBe(true)
   })
 })

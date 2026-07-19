@@ -140,13 +140,22 @@ export async function disableSkill(
 
   removeInstalledSkill(workspaceRoot, id)
 
-  const updated = upsertEntry(registry, {
-    id,
-    source,
-    zone,
-    enabled: false,
-    updatedAt: new Date().toISOString(),
-  })
+  const now = new Date().toISOString()
+  const hasEntries = registry.entries.some((e) => e.id === id)
+  const updated = hasEntries
+    ? {
+        version: 1 as const,
+        entries: registry.entries.map((e) =>
+          e.id === id ? { ...e, enabled: false, updatedAt: now } : e,
+        ),
+      }
+    : upsertEntry(registry, {
+        id,
+        source,
+        zone,
+        enabled: false,
+        updatedAt: now,
+      })
   saveRegistry(workspaceRoot, updated)
 
   // Prefer returning list item from catalog when still present
