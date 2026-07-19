@@ -31,12 +31,17 @@ function sourceBadge(skill: SkillListItem): string {
   return 'runtime'
 }
 
+/** Composite key so runtime+factory rows with the same id stay distinct. */
+function skillKey(skill: Pick<SkillListItem, 'source' | 'zone' | 'id'>): string {
+  return `${skill.source}:${skill.zone ?? ''}:${skill.id}`
+}
+
 export default function SkillsPanel(): ReactElement {
   const [skills, setSkills] = useState<SkillListItem[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [detail, setDetail] = useState<SkillDetail | null>(null)
   const [loading, setLoading] = useState(true)
-  const [busyId, setBusyId] = useState<string | null>(null)
+  const [busyKey, setBusyKey] = useState<string | null>(null)
   const [error, setError] = useState<{ code?: string; message: string } | null>(
     null,
   )
@@ -62,11 +67,15 @@ export default function SkillsPanel(): ReactElement {
     void loadList()
   }, [])
 
-  async function openDetail(id: string): Promise<void> {
-    setSelectedId(id)
+  async function openDetail(skill: SkillListItem): Promise<void> {
+    const key = skillKey(skill)
+    setSelectedKey(key)
     setError(null)
     try {
-      const result = await getSkill(id)
+      const result = await getSkill(skill.id, {
+        source: skill.source,
+        zone: skill.zone,
+      })
       if (!result.ok) {
         setError({ code: result.error.code, message: result.error.message })
         setDetail(null)
@@ -80,8 +89,9 @@ export default function SkillsPanel(): ReactElement {
   }
 
   async function toggleEnabled(skill: SkillListItem): Promise<void> {
-    if (busyId) return
-    setBusyId(skill.id)
+    if (busyKey) return
+    const key = skillKey(skill)
+    setBusyKey(key)
     setError(null)
     try {
       const result = skill.enabled
@@ -94,16 +104,14 @@ export default function SkillsPanel(): ReactElement {
         setError({ code: result.error.code, message: result.error.message })
         return
       }
-      setSkills((prev) =>
-        prev.map((item) => (item.id === skill.id ? result.data : item)),
-      )
-      if (selectedId === skill.id) {
-        setDetail((prev) => (prev ? { ...prev, ...result.data } : prev))
+      await loadList()
+      if (selectedKey === key) {
+        await openDetail(skill)
       }
     } catch (err) {
       setError(skillsRunError(err))
     } finally {
-      setBusyId(null)
+      setBusyKey(null)
     }
   }
 
@@ -121,53 +129,56 @@ export default function SkillsPanel(): ReactElement {
           <p className="form-field__loading">No skills found</p>
         ) : (
           <div className="form-field">
-            {skills.map((skill) => (
-              <div
-                key={`${skill.source}:${skill.id}`}
-                className="toggle-setting"
-                data-selected={selectedId === skill.id ? 'true' : undefined}
-              >
-                <button
-                  type="button"
-                  disabled={busyId === skill.id}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    void toggleEnabled(skill)
-                  }}
-                  className={`toggle mt-0.5${skill.enabled ? ' toggle--on' : ' toggle--off'}`}
-                  aria-label={
-                    skill.enabled
-                      ? `Disable ${skill.name}`
-                      : `Enable ${skill.name}`
-                  }
+            {skills.map((skill) => {
+              const key = skillKey(skill)
+              return (
+                <div
+                  key={`${skill.source}:${skill.id}`}
+                  className="toggle-setting"
+                  data-selected={selectedKey === key ? 'true' : undefined}
                 >
-                  <span
-                    className={`toggle__knob${skill.enabled ? ' toggle__knob--on' : ' toggle__knob--off'}`}
-                  />
-                </button>
-                <button
-                  type="button"
-                  className="toggle-setting__info text-left w-full"
-                  onClick={() => void openDetail(skill.id)}
-                >
-                  <p className="toggle-setting__label">
-                    /{skill.name}{' '}
-                    <span className="memory-settings__entry-type">
-                      [{sourceBadge(skill)}]
-                    </span>
-                    {skill.installed ? (
+                  <button
+                    type="button"
+                    disabled={busyKey === key}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      void toggleEnabled(skill)
+                    }}
+                    className={`toggle mt-0.5${skill.enabled ? ' toggle--on' : ' toggle--off'}`}
+                    aria-label={
+                      skill.enabled
+                        ? `Disable ${skill.name}`
+                        : `Enable ${skill.name}`
+                    }
+                  >
+                    <span
+                      className={`toggle__knob${skill.enabled ? ' toggle__knob--on' : ' toggle__knob--off'}`}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    className="toggle-setting__info text-left w-full"
+                    onClick={() => void openDetail(skill)}
+                  >
+                    <p className="toggle-setting__label">
+                      /{skill.name}{' '}
                       <span className="memory-settings__entry-type">
-                        {' '}
-                        installed
+                        [{sourceBadge(skill)}]
                       </span>
-                    ) : null}
-                  </p>
-                  <p className="toggle-setting__desc">
-                    {skill.description || 'No description'}
-                  </p>
-                </button>
-              </div>
-            ))}
+                      {skill.installed ? (
+                        <span className="memory-settings__entry-type">
+                          {' '}
+                          installed
+                        </span>
+                      ) : null}
+                    </p>
+                    <p className="toggle-setting__desc">
+                      {skill.description || 'No description'}
+                    </p>
+                  </button>
+                </div>
+              )
+            })}
           </div>
         )}
       </section>

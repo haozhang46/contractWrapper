@@ -143,4 +143,49 @@ describe('/api/skills', () => {
     expect(body.ok).toBe(false)
     expect(body.error.code).toBe('SKILL_FACTORY_UNAVAILABLE')
   })
+
+  test('GET /:id?source=factory returns factory detail when id collides', async () => {
+    const root = makeWorkspace()
+    writeRuntimeSkill(
+      root,
+      'shared',
+      '---\ndescription: Runtime body\n---\n\n# Runtime\n',
+    )
+
+    const factory = {
+      assetsRoot: '/virtual-assets',
+      skillList: () => [{ id: 'shared', zone: 'published' as const }],
+      skillGet: (
+        _assetsRoot: string,
+        id: string,
+        zone?: 'staging' | 'published',
+      ) => ({
+        id,
+        zone: zone ?? ('published' as const),
+        skillMd: '---\ndescription: Factory body\n---\n\n# Factory\n',
+      }),
+    }
+
+    const api = createSkillsRoutes({ workspaceRoot: root, factory })
+    const app = new Hono().route('/api/skills', api)
+
+    const defaultRes = await app.request('http://localhost/api/skills/shared')
+    expect(defaultRes.status).toBe(200)
+    const defaultBody = await defaultRes.json()
+    expect(defaultBody.data.source).toBe('runtime')
+
+    const factoryRes = await app.request(
+      'http://localhost/api/skills/shared?source=factory',
+    )
+    expect(factoryRes.status).toBe(200)
+    const factoryBody = await factoryRes.json()
+    expect(factoryBody.ok).toBe(true)
+    expect(factoryBody.data).toMatchObject({
+      id: 'shared',
+      source: 'factory',
+      zone: 'published',
+      description: 'Factory body',
+    })
+    expect(factoryBody.data.skillMd).toContain('Factory body')
+  })
 })

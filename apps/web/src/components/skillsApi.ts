@@ -67,8 +67,17 @@ export function listSkills(opts?: {
   )
 }
 
-export function getSkill(id: string): Promise<SkillsResult<SkillDetail>> {
-  return skillsFetch<SkillDetail>(`/${encodeURIComponent(id)}`)
+export function getSkill(
+  id: string,
+  opts?: { source?: SkillSource; zone?: SkillZone },
+): Promise<SkillsResult<SkillDetail>> {
+  const params = new URLSearchParams()
+  if (opts?.source) params.set('source', opts.source)
+  if (opts?.zone) params.set('zone', opts.zone)
+  const qs = params.toString()
+  return skillsFetch<SkillDetail>(
+    `/${encodeURIComponent(id)}${qs ? `?${qs}` : ''}`,
+  )
 }
 
 export function enableSkill(

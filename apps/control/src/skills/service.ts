@@ -50,21 +50,38 @@ export async function listSkills(
   return items
 }
 
+export type GetSkillOpts = {
+  source?: SkillSource
+  zone?: SkillZone
+}
+
 export async function getSkill(
   workspaceRoot: string,
   id: string,
   factory?: FactoryTools | null,
+  opts?: GetSkillOpts,
 ): Promise<SkillDetail> {
   const catalog = collectCatalog(workspaceRoot, factory ?? null)
-  const entry = catalog.find((e) => e.id === id)
+  const entry = catalog.find((e) => {
+    if (e.id !== id) return false
+    if (opts?.source && e.source !== opts.source) return false
+    if (opts?.zone != null && e.zone !== opts.zone) return false
+    return true
+  })
   if (!entry) throw new SkillNotFoundError(id)
 
   const registry = loadRegistry(workspaceRoot)
   const item = toListItem(workspaceRoot, entry, registry)
   const installedPath = installSkillMdPath(workspaceRoot, id)
-  const skillMd = existsSync(installedPath)
-    ? readFileSync(installedPath, 'utf-8')
-    : entry.skillMd
+  // Installed copy is shared by id; only prefer it when it matches the selected
+  // catalog entry's source (runtime default / enabled source).
+  const reg = registry.entries.find(
+    (e) => e.id === id && e.enabled && e.source === entry.source,
+  )
+  const skillMd =
+    reg && existsSync(installedPath)
+      ? readFileSync(installedPath, 'utf-8')
+      : entry.skillMd
 
   return {
     ...item,

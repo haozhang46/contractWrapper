@@ -94,9 +94,19 @@ export function createSkillsRoutes(opts: {
 
   api.get('/:id', async c => {
     const id = c.req.param('id')
+    const sourceQuery = c.req.query('source')
+    const zoneQuery = c.req.query('zone')
+    const source: SkillSource | undefined =
+      sourceQuery === 'runtime' || sourceQuery === 'factory'
+        ? sourceQuery
+        : undefined
+    const zone: SkillZone | undefined =
+      zoneQuery === 'staging' || zoneQuery === 'published'
+        ? zoneQuery
+        : undefined
     const factory = await resolveFactory()
     try {
-      const data = await getSkill(workspaceRoot, id, factory)
+      const data = await getSkill(workspaceRoot, id, factory, { source, zone })
       return c.json({ ok: true, data })
     } catch (err) {
       const mapped = mapSkillError(err)

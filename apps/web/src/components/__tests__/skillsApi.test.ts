@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test'
-import { skillsFetch, skillsRunError } from '../skillsApi'
+import { getSkill, skillsFetch, skillsRunError } from '../skillsApi'
 
 afterEach(() => {
   mock.restore()
@@ -63,5 +63,60 @@ describe('skillsFetch', () => {
       throw new Error('Failed to fetch')
     }) as unknown as typeof fetch
     await expect(skillsFetch('')).rejects.toThrow('Failed to fetch')
+  })
+})
+
+describe('getSkill', () => {
+  test('builds query string for source and zone', async () => {
+    const fetchMock = mock(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      expect(url).toBe('/api/skills/shared?source=factory&zone=published')
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          data: {
+            id: 'shared',
+            name: 'shared',
+            source: 'factory',
+            zone: 'published',
+            skillMd: '# Factory\n',
+            enabled: false,
+            installed: false,
+            description: 'Factory',
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
+    })
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+
+    const r = await getSkill('shared', { source: 'factory', zone: 'published' })
+    expect(r.ok).toBe(true)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('omits query when no source/zone', async () => {
+    const fetchMock = mock(async (input: RequestInfo | URL) => {
+      expect(String(input)).toBe('/api/skills/demo')
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          data: {
+            id: 'demo',
+            name: 'demo',
+            source: 'runtime',
+            skillMd: '# Demo\n',
+            enabled: false,
+            installed: false,
+            description: 'Demo',
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
+    })
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+
+    await getSkill('demo')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

@@ -13,6 +13,7 @@ import { loadRegistry } from '../registry.ts'
 import {
   disableSkill,
   enableSkill,
+  getSkill,
   listSkills,
 } from '../service.ts'
 import type { FactoryTools } from '../types.ts'
@@ -87,6 +88,72 @@ describe('listSkills', () => {
 
     const items = await listSkills(root, { factory: null })
     expect(items.every((s) => s.source === 'runtime')).toBe(true)
+  })
+})
+
+describe('getSkill', () => {
+  test('same id runtime+factory — source=factory returns factory body', async () => {
+    const root = makeWorkspace()
+    writeRuntimeSkill(
+      root,
+      'shared',
+      '---\ndescription: Runtime body\n---\n\n# Runtime\n',
+    )
+
+    const factory: FactoryTools = {
+      assetsRoot: '/virtual-assets',
+      skillList: () => [{ id: 'shared', zone: 'published' }],
+      skillGet: (_assetsRoot, id, zone) => ({
+        id,
+        zone: zone ?? 'published',
+        skillMd: '---\ndescription: Factory body\n---\n\n# Factory\n',
+      }),
+    }
+
+    const withoutSource = await getSkill(root, 'shared', factory)
+    expect(withoutSource.source).toBe('runtime')
+    expect(withoutSource.skillMd).toContain('Runtime body')
+
+    const factoryDetail = await getSkill(root, 'shared', factory, {
+      source: 'factory',
+    })
+    expect(factoryDetail).toMatchObject({
+      id: 'shared',
+      source: 'factory',
+      zone: 'published',
+      description: 'Factory body',
+    })
+    expect(factoryDetail.skillMd).toContain('Factory body')
+  })
+
+  test('source=factory + zone filters factory entry', async () => {
+    const root = makeWorkspace()
+    const factory: FactoryTools = {
+      assetsRoot: '/virtual-assets',
+      skillList: () => [
+        { id: 'zoned', zone: 'staging' },
+        { id: 'zoned', zone: 'published' },
+      ],
+      skillGet: (_assetsRoot, id, zone) => ({
+        id,
+        zone: zone ?? 'published',
+        skillMd:
+          zone === 'staging'
+            ? '---\ndescription: Staging\n---\n\n# Staging\n'
+            : '---\ndescription: Published\n---\n\n# Published\n',
+      }),
+    }
+
+    const staging = await getSkill(root, 'zoned', factory, {
+      source: 'factory',
+      zone: 'staging',
+    })
+    expect(staging).toMatchObject({
+      source: 'factory',
+      zone: 'staging',
+      description: 'Staging',
+    })
+    expect(staging.skillMd).toContain('Staging')
   })
 })
 
