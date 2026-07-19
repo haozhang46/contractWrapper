@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import '@harness/widgets/skill-factory'
 import App from './App'
 import './styles/index.css'
+import './styles/headless-pages.css'
 import { initErrorReporting } from './monitoring/error-reporting'
 
 initErrorReporting()

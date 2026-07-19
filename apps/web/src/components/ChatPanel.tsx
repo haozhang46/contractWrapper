@@ -13,6 +13,7 @@ import {
   filterSkills,
   parseSlashQuery,
 } from './slashSkill'
+import HeadlessPagesPanel from './HeadlessPagesPanel'
 
 type OpenTab = {
   id: string
@@ -48,6 +49,7 @@ export default function ChatPanel(): ReactElement {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [memToast, setMemToast] = useState('')
   const [enabledSkills, setEnabledSkills] = useState<SkillListItem[]>([])
+  const [activePage, setActivePage] = useState<string | null>(null)
   const [slashIndex, setSlashIndex] = useState(0)
   const [slashDismissed, setSlashDismissed] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -498,6 +500,14 @@ export default function ChatPanel(): ReactElement {
             </p>
           )}
         </div>
+
+        {/* ── Headless Pages ── */}
+        <div className="chat-panel__pages-section">
+          <HeadlessPagesPanel
+            selectedPageId={activePage}
+            onPageSelect={setActivePage}
+          />
+        </div>
       </div>
 
       <button
@@ -547,14 +557,21 @@ export default function ChatPanel(): ReactElement {
 
         <div ref={scrollRef} className="chat-panel__messages">
           {!activeTab ? (
-            <div className="chat-panel__messages--empty">
-              <div className="text-center">
-                <p className="chat-panel__empty-title">Chat</p>
-                <p className="chat-panel__empty-subtitle">
-                  Open a conversation from the sidebar or start a new tab.
-                </p>
+            activePage ? (
+              <HeadlessPagesPanel
+                selectedPageId={activePage}
+                onPageSelect={setActivePage}
+              />
+            ) : (
+              <div className="chat-panel__messages--empty">
+                <div className="text-center">
+                  <p className="chat-panel__empty-title">Chat</p>
+                  <p className="chat-panel__empty-subtitle">
+                    Open a conversation from the sidebar or start a new tab.
+                  </p>
+                </div>
               </div>
-            </div>
+            )
           ) : messages.length === 0 ? (
             <div className="chat-panel__messages--empty">
               <div className="text-center">

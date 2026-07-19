@@ -1,0 +1,84 @@
+.headless-pages__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 4px;
+}
+
+.headless-pages__main {
+  padding: 16px;
+}
+
+.dynamic-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dynamic-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dynamic-form__label {
+  font-size: 13px;
+  color: #a1a1aa;
+  font-weight: 500;
+}
+
+.dynamic-form__input,
+.dynamic-form__textarea,
+.dynamic-form__select {
+  background: #27272a;
+  border: 1px solid #3f3f46;
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: #e4e4e7;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.dynamic-form__input:focus,
+.dynamic-form__textarea:focus,
+.dynamic-form__select:focus {
+  border-color: #D77757;
+}
+
+.dynamic-form__textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.dynamic-form__submit {
+  background: #D77757;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.dynamic-form__submit:hover:not(:disabled) {
+  background: #c0684e;
+}
+
+.dynamic-form__submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dynamic-form__error {
+  font-size: 12px;
+  color: #f87171;
+}
+
+.chat-panel__pages-section {
+  border-top: 1px solid #3f3f46;
+  margin-top: 8px;
+  padding-top: 4px;
+}
