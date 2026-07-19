@@ -121,12 +121,12 @@ describe('CcbSlot', () => {
     }
   })
 
-  test('turns are serial — second waits for first done', async () => {
-    const slot = createTestSlot()
+  test('poolSize 1 — second waits for first done', async () => {
+    const slot = createTestSlot({ workspaceRoot: '/tmp', poolSize: 1 })
     await slot.initSession({ workspaceRoot: '/tmp' })
     const order: string[] = []
     const first = slot.sendMessageWithHistory(
-      [{ role: 'user', content: 'one' }],
+      [{ role: 'user', content: 'delay' }],
       e => {
         if (e.type === 'done') order.push('first-done')
       },
@@ -140,6 +140,35 @@ describe('CcbSlot', () => {
     )
     await Promise.all([first, second])
     expect(order).toEqual(['first-done', 'second-delta', 'second-done'])
+  })
+
+  test('poolSize 2 — two delay turns overlap', async () => {
+    const slot = createTestSlot({ workspaceRoot: '/tmp', poolSize: 2 })
+    await slot.initSession({ workspaceRoot: '/tmp' })
+    const started: number[] = []
+    const doneAt: number[] = []
+    const t0 = Date.now()
+    const a = slot.sendMessageWithHistory(
+      [{ role: 'user', content: 'delay' }],
+      e => {
+        if (e.type === 'text-delta') started.push(Date.now() - t0)
+        if (e.type === 'done') doneAt.push(Date.now() - t0)
+      },
+    )
+    const b = slot.sendMessageWithHistory(
+      [{ role: 'user', content: 'delay' }],
+      e => {
+        if (e.type === 'text-delta') started.push(Date.now() - t0)
+        if (e.type === 'done') doneAt.push(Date.now() - t0)
+      },
+    )
+    await Promise.all([a, b])
+    expect(started).toHaveLength(2)
+    expect(doneAt).toHaveLength(2)
+    // Parallel: both deltas land near each other (spawn + 200ms delay).
+    // Serial would place the second near ~2× (spawn+delay) ≈ 500ms+.
+    expect(Math.abs(started[0]! - started[1]!)).toBeLessThan(120)
+    expect(Math.max(...doneAt)).toBeLessThan(400)
   })
 
   test('getDefaultSlot returns CcbSlot', () => {
@@ -223,8 +252,8 @@ describe('CcbSlot', () => {
     }
   })
 
-  test('queued turn abort does not kill in-flight turn', async () => {
-    const slot = createTestSlot()
+  test('queued turn abort does not kill in-flight turn (poolSize 1)', async () => {
+    const slot = createTestSlot({ workspaceRoot: '/tmp', poolSize: 1 })
     await slot.initSession({ workspaceRoot: '/tmp' })
     const eventsA: SlotEvent[] = []
     const eventsB: SlotEvent[] = []
@@ -262,6 +291,42 @@ describe('CcbSlot', () => {
     if (errB?.type === 'error') {
       expect(errB.message).toContain('aborted')
     }
+    expect(eventsB.every(e => e.type !== 'done')).toBe(true)
+  })
+
+  test('abort one parallel worker does not kill the other (poolSize 2)', async () => {
+    const slot = createTestSlot({ workspaceRoot: '/tmp', poolSize: 2 })
+    await slot.initSession({ workspaceRoot: '/tmp' })
+    const eventsA: SlotEvent[] = []
+    const eventsB: SlotEvent[] = []
+    const acA = new AbortController()
+    const acB = new AbortController()
+
+    const turnA = slot.sendMessageWithHistory(
+      [{ role: 'user', content: 'delay' }],
+      e => eventsA.push(e),
+      acA.signal,
+    )
+    const turnB = slot.sendMessageWithHistory(
+      [{ role: 'user', content: 'slow' }],
+      e => eventsB.push(e),
+      acB.signal,
+    )
+
+    await Bun.sleep(50)
+    acB.abort()
+    slot.abort(acB.signal)
+
+    await Promise.race([
+      Promise.all([turnA, turnB]),
+      Bun.sleep(3000).then(() => {
+        throw new Error('turns hung after parallel abort')
+      }),
+    ])
+
+    expect(eventsA.some(e => e.type === 'text-delta')).toBe(true)
+    expect(eventsA.at(-1)?.type).toBe('done')
+    expect(eventsB.some(e => e.type === 'error')).toBe(true)
     expect(eventsB.every(e => e.type !== 'done')).toBe(true)
   })
 })

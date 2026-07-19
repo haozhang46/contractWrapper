@@ -14,12 +14,35 @@ import {
   parseSlashQuery,
 } from './slashSkill'
 
+type OpenTab = {
+  id: string
+  title: string
+  messages: ChatMessage[]
+  streaming: boolean
+}
+
+function mapMessagesFromDetail(
+  detailMessages: Array<{
+    role: string
+    content: string
+    toolCalls?: ToolCallEvent[]
+  }>,
+): ChatMessage[] {
+  return detailMessages.map(m => ({
+    id: crypto.randomUUID(),
+    role: m.role as ChatMessage['role'],
+    content: m.content,
+    timestamp: new Date().toISOString(),
+    status: 'complete' as const,
+    toolCalls: m.toolCalls,
+  }))
+}
+
 export default function ChatPanel(): ReactElement {
   const [sessions, setSessions] = useState<SessionMetaDTO[]>([])
+  const [openTabs, setOpenTabs] = useState<OpenTab[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
-  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
-  const [streaming, setStreaming] = useState(false)
   const [pendingConfirm, setPendingConfirm] = useState(false)
   const [composing, setComposing] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -29,7 +52,13 @@ export default function ChatPanel(): ReactElement {
   const [slashDismissed, setSlashDismissed] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const abortRef = useRef<AbortController | null>(null)
+  const abortByTabRef = useRef(new Map<string, AbortController>())
+  const openTabsRef = useRef(openTabs)
+  openTabsRef.current = openTabs
+
+  const activeTab = openTabs.find(t => t.id === activeId) ?? null
+  const messages = activeTab?.messages ?? []
+  const streaming = activeTab?.streaming ?? false
 
   const slashQuery = parseSlashQuery(input)
   const slashOpen = Boolean(slashQuery?.active) && !slashDismissed
@@ -43,12 +72,24 @@ export default function ChatPanel(): ReactElement {
       )
     : []
 
+  const updateTab = useCallback(function updateTab(
+    id: string,
+    patch: Partial<OpenTab> | ((tab: OpenTab) => OpenTab),
+  ) {
+    setOpenTabs(prev =>
+      prev.map(t => {
+        if (t.id !== id) return t
+        return typeof patch === 'function' ? patch(t) : { ...t, ...patch }
+      }),
+    )
+  }, [])
+
   const refreshEnabledSkills = useCallback(async function refreshEnabledSkills() {
     try {
       const result = await listSkills({ enabledOnly: true })
       if (result.ok) setEnabledSkills(result.data)
     } catch {
-      // picker is best-effort; chat still works without it
+      // picker is best-effort
     }
   }, [])
 
@@ -77,7 +118,6 @@ export default function ChatPanel(): ReactElement {
     function selectSlashSkill(name: string) {
       setInput((prev) => {
         const next = applySlashInsert(prev, name)
-        // Trailing space ends the slash token so the picker closes.
         return parseSlashQuery(next) ? `${next} ` : next
       })
       setSlashDismissed(true)
@@ -90,9 +130,8 @@ export default function ChatPanel(): ReactElement {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [messages])
+  }, [messages, activeId])
 
-  // While streaming, watch pending confirms so status can explain "stuck" waits.
   useEffect(function pollPendingConfirms() {
     if (!streaming) {
       setPendingConfirm(false)
@@ -106,7 +145,7 @@ export default function ChatPanel(): ReactElement {
         const data = (await res.json()) as { pending?: unknown[] }
         if (!closed) setPendingConfirm((data.pending?.length ?? 0) > 0)
       } catch {
-        // Transient — status bar is advisory, not critical
+        // advisory
       }
     }
     void poll()
@@ -123,7 +162,7 @@ export default function ChatPanel(): ReactElement {
       const data = await res.json()
       setSessions(toSessionMetaList(data.sessions))
     } catch {
-      // chat API may be unavailable until later tasks
+      // ignore
     }
   }, [])
 
@@ -131,33 +170,13 @@ export default function ChatPanel(): ReactElement {
     void loadSessions()
   }, [loadSessions])
 
-  const openSession = useCallback(async function openSession(id: string) {
-    try {
-      const res = await fetch(`/api/chat-sessions/${id}`)
-      const data = await res.json()
-      const detail = toSessionDetail(data)
-      if (detail.messages.length > 0) {
-        setActiveId(detail.id)
-        setMessages(
-          detail.messages.map(m => ({
-            id: crypto.randomUUID(),
-            role: m.role,
-            content: m.content,
-            timestamp: new Date().toISOString(),
-            status: 'complete' as const,
-            toolCalls: m.toolCalls,
-          })),
-        )
-      }
-    } catch {
-      // ignore
-    }
-  }, [])
-
   const saveSession = useCallback(
-    async function saveSession(msgs: ChatMessage[], title?: string) {
-      const id = activeId ?? `chat_${Date.now()}`
-      if (!activeId) setActiveId(id)
+    async function saveSession(
+      tabId: string,
+      msgs: ChatMessage[],
+      title?: string,
+    ) {
+      const id = tabId.startsWith('draft_') ? `chat_${Date.now()}` : tabId
       try {
         const apiMessages = msgs
           .filter(m => m.role === 'user' || m.role === 'assistant')
@@ -177,34 +196,108 @@ export default function ChatPanel(): ReactElement {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id, title: sessionTitle, messages: apiMessages }),
         })
+        if (id !== tabId) {
+          // Promote draft tab id to persisted session id.
+          const ac = abortByTabRef.current.get(tabId)
+          if (ac) {
+            abortByTabRef.current.delete(tabId)
+            abortByTabRef.current.set(id, ac)
+          }
+          setOpenTabs(prev =>
+            prev.map(t =>
+              t.id === tabId ? { ...t, id, title: sessionTitle } : t,
+            ),
+          )
+          setActiveId(prev => (prev === tabId ? id : prev))
+        } else {
+          updateTab(id, { title: sessionTitle })
+        }
         void loadSessions()
+        return id
       } catch {
-        // ignore
+        return tabId
       }
     },
-    [activeId, loadSessions],
+    [loadSessions, updateTab],
   )
 
+  const openSession = useCallback(async function openSession(id: string) {
+    if (openTabsRef.current.some(t => t.id === id)) {
+      setActiveId(id)
+      return
+    }
+    try {
+      const res = await fetch(`/api/chat-sessions/${id}`)
+      const data = await res.json()
+      const detail = toSessionDetail(data)
+      const title = sessions.find(s => s.id === id)?.title || 'Chat'
+      const tab: OpenTab = {
+        id: detail.id,
+        title,
+        messages: mapMessagesFromDetail(detail.messages),
+        streaming: false,
+      }
+      setOpenTabs(prev => (prev.some(t => t.id === detail.id) ? prev : [...prev, tab]))
+      setActiveId(detail.id)
+    } catch {
+      // ignore
+    }
+  }, [sessions])
+
   const newChat = useCallback(function newChat() {
-    abortRef.current?.abort()
-    abortRef.current = null
-    setActiveId(null)
-    setMessages([])
-    setStreaming(false)
+    const id = `draft_${Date.now()}`
+    const tab: OpenTab = {
+      id,
+      title: 'New Chat',
+      messages: [],
+      streaming: false,
+    }
+    setOpenTabs(prev => [...prev, tab])
+    setActiveId(id)
+    setInput('')
   }, [])
 
-  const deleteSession = useCallback(async function deleteSession(id: string) {
-    await fetch(`/api/chat-sessions/${id}`, { method: 'DELETE' })
-    if (activeId === id) newChat()
-    void loadSessions()
-  }, [activeId, loadSessions, newChat])
+  const closeTab = useCallback(
+    function closeTab(id: string) {
+      abortByTabRef.current.get(id)?.abort()
+      abortByTabRef.current.delete(id)
+      setOpenTabs(prev => {
+        const idx = prev.findIndex(t => t.id === id)
+        const next = prev.filter(t => t.id !== id)
+        setActiveId(cur => {
+          if (cur !== id) return cur
+          if (next.length === 0) return null
+          const fallback = next[Math.min(idx, next.length - 1)]
+          return fallback?.id ?? null
+        })
+        return next
+      })
+    },
+    [],
+  )
 
-  const handleStop = useCallback(function handleStop() {
-    abortRef.current?.abort()
-  }, [])
+  const deleteSession = useCallback(
+    async function deleteSession(id: string) {
+      await fetch(`/api/chat-sessions/${id}`, { method: 'DELETE' })
+      if (openTabsRef.current.some(t => t.id === id)) closeTab(id)
+      void loadSessions()
+    },
+    [closeTab, loadSessions],
+  )
+
+  const handleStop = useCallback(
+    function handleStop() {
+      if (!activeId) return
+      abortByTabRef.current.get(activeId)?.abort()
+    },
+    [activeId],
+  )
 
   const handleSend = useCallback(async function handleSend() {
-    if (!input.trim() || streaming) return
+    if (!input.trim() || !activeId) return
+    const tabId = activeId
+    const tab = openTabsRef.current.find(t => t.id === tabId)
+    if (!tab || tab.streaming) return
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -222,14 +315,18 @@ export default function ChatPanel(): ReactElement {
       toolCalls: [],
     }
 
-    const history = [...messages, userMsg]
+    const history = [...tab.messages, userMsg]
     let live: ChatMessage[] = [...history, assistantMsg]
-    setMessages(live)
+    updateTab(tabId, { messages: live, streaming: true })
     setInput('')
-    setStreaming(true)
 
     const ac = new AbortController()
-    abortRef.current = ac
+    abortByTabRef.current.set(tabId, ac)
+
+    const patchLive = (next: ChatMessage[]) => {
+      live = next
+      updateTab(tabId, { messages: next })
+    }
 
     try {
       const apiMessages = history
@@ -262,8 +359,7 @@ export default function ChatPanel(): ReactElement {
           if (!line.startsWith('data: ')) continue
           const data = line.slice(6)
           if (data === '[DONE]') {
-            live = markAssistantComplete(live)
-            setMessages(live)
+            patchLive(markAssistantComplete(live))
             break
           }
           try {
@@ -276,8 +372,7 @@ export default function ChatPanel(): ReactElement {
             if (event.type === 'text-delta' && event.content) {
               fullContent += event.content
             }
-            live = applyChatStreamEvent(live, event)
-            setMessages(live)
+            patchLive(applyChatStreamEvent(live, event))
           } catch {
             // ignore malformed stream chunks
           }
@@ -287,23 +382,23 @@ export default function ChatPanel(): ReactElement {
       if (ac.signal.aborted) {
         const last = live[live.length - 1]
         if (last?.role === 'assistant') {
-          live = [
+          const stopped = [
             ...live.slice(0, -1),
             {
               ...last,
-              status: 'complete',
+              status: 'complete' as const,
               content: last.content || '(stopped)',
             },
           ]
-          setMessages(live)
-          void saveSession(live)
+          patchLive(stopped)
+          void saveSession(tabId, stopped)
         }
         return
       }
 
       live = markAssistantComplete(live)
-      setMessages(live)
-      void saveSession(live)
+      patchLive(live)
+      void saveSession(tabId, live)
 
       fetch('/api/memory/extract', {
         method: 'POST',
@@ -328,30 +423,33 @@ export default function ChatPanel(): ReactElement {
       if (ac.signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
         const last = live[live.length - 1]
         if (last?.role === 'assistant') {
-          live = [
+          const stopped = [
             ...live.slice(0, -1),
             {
               ...last,
-              status: 'complete',
+              status: 'complete' as const,
               content: last.content || '(stopped)',
             },
           ]
-          setMessages(live)
-          void saveSession(live)
+          patchLive(stopped)
+          void saveSession(tabId, stopped)
         }
       } else {
-        live = applyChatStreamEvent(live, {
-          type: 'error',
-          message: String(err),
-        })
-        setMessages(live)
+        patchLive(
+          applyChatStreamEvent(live, {
+            type: 'error',
+            message: String(err),
+          }),
+        )
       }
     } finally {
-      if (abortRef.current === ac) abortRef.current = null
-      setStreaming(false)
-      setPendingConfirm(false)
+      if (abortByTabRef.current.get(tabId) === ac) {
+        abortByTabRef.current.delete(tabId)
+      }
+      updateTab(tabId, { streaming: false })
+      if (activeId === tabId) setPendingConfirm(false)
     }
-  }, [input, messages, streaming, saveSession])
+  }, [activeId, input, saveSession, updateTab])
 
   const statusLabel = deriveChatStatus(messages, streaming, { pendingConfirm })
 
@@ -373,10 +471,15 @@ export default function ChatPanel(): ReactElement {
           {sessions.map(s => (
             <div
               key={s.id}
-              onClick={() => openSession(s.id)}
+              onClick={() => void openSession(s.id)}
               className={`chat-panel__session-item${activeId === s.id ? ' chat-panel__session-item--active' : ''}`}
             >
               <span className="chat-panel__session-title">{s.title}</span>
+              {openTabs.some(t => t.id === s.id && t.streaming) && (
+                <span className="chat-panel__session-streaming" title="Streaming">
+                  ·
+                </span>
+              )}
               <button
                 type="button"
                 onClick={e => {
@@ -406,13 +509,58 @@ export default function ChatPanel(): ReactElement {
       </button>
 
       <div className="chat-panel__main">
+        <div className="chat-panel__tabs" role="tablist">
+          {openTabs.map(tab => (
+            <div
+              key={tab.id}
+              role="tab"
+              aria-selected={tab.id === activeId}
+              className={`chat-panel__tab${tab.id === activeId ? ' chat-panel__tab--active' : ''}`}
+              onClick={() => setActiveId(tab.id)}
+            >
+              {tab.streaming && (
+                <span className="chat-panel__tab-dot" aria-hidden />
+              )}
+              <span className="chat-panel__tab-title">{tab.title}</span>
+              <button
+                type="button"
+                className="chat-panel__tab-close"
+                aria-label={`Close ${tab.title}`}
+                onClick={e => {
+                  e.stopPropagation()
+                  closeTab(tab.id)
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            className="chat-panel__tab-new"
+            onClick={newChat}
+            aria-label="New chat tab"
+          >
+            +
+          </button>
+        </div>
+
         <div ref={scrollRef} className="chat-panel__messages">
-          {messages.length === 0 ? (
+          {!activeTab ? (
             <div className="chat-panel__messages--empty">
               <div className="text-center">
                 <p className="chat-panel__empty-title">Chat</p>
                 <p className="chat-panel__empty-subtitle">
-                  Start a new conversation or select one from the sidebar.
+                  Open a conversation from the sidebar or start a new tab.
+                </p>
+              </div>
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="chat-panel__messages--empty">
+              <div className="text-center">
+                <p className="chat-panel__empty-title">{activeTab.title}</p>
+                <p className="chat-panel__empty-subtitle">
+                  Send a message to begin.
                 </p>
               </div>
             </div>
@@ -430,7 +578,7 @@ export default function ChatPanel(): ReactElement {
             {memToast}
           </div>
         )}
-        {statusLabel && (
+        {activeTab && statusLabel && (
           <div className="chat-panel__status">
             <span className="chat-panel__status-dot" />
             <span className="chat-panel__status-text">{statusLabel}</span>
@@ -484,10 +632,18 @@ export default function ChatPanel(): ReactElement {
                       return
                     }
                   }
-                  if (e.key === 'Enter' && !composing && !streaming) void handleSend()
+                  if (e.key === 'Enter' && !composing && !streaming && activeTab) {
+                    void handleSend()
+                  }
                 }}
-                placeholder={streaming ? statusLabel ?? 'Working…' : 'Type a message...'}
-                disabled={streaming}
+                placeholder={
+                  !activeTab
+                    ? 'Open or create a chat…'
+                    : streaming
+                      ? statusLabel ?? 'Working…'
+                      : 'Type a message...'
+                }
+                disabled={!activeTab || streaming}
                 className="chat-panel__input"
               />
               {streaming ? (
@@ -502,7 +658,7 @@ export default function ChatPanel(): ReactElement {
                 <button
                   type="button"
                   onClick={() => void handleSend()}
-                  disabled={!input.trim()}
+                  disabled={!activeTab || !input.trim()}
                   className="chat-panel__send-btn"
                 >
                   Send

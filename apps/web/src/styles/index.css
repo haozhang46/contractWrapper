@@ -122,6 +122,42 @@
   @apply flex-1 flex flex-col min-w-0;
 }
 
+.chat-panel__tabs {
+  @apply flex items-stretch gap-0.5 px-2 pt-2 border-b border-zinc-800 overflow-x-auto shrink-0;
+}
+
+.chat-panel__tab {
+  @apply flex items-center gap-1.5 max-w-[10rem] px-2.5 py-1.5 text-xs text-zinc-400 rounded-t-md cursor-pointer border border-transparent border-b-0;
+}
+
+.chat-panel__tab:hover {
+  @apply bg-zinc-800/60 text-zinc-200;
+}
+
+.chat-panel__tab--active {
+  @apply bg-zinc-800 text-white border-zinc-700;
+}
+
+.chat-panel__tab-dot {
+  @apply w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0 animate-pulse;
+}
+
+.chat-panel__tab-title {
+  @apply truncate;
+}
+
+.chat-panel__tab-close {
+  @apply opacity-50 hover:opacity-100 text-zinc-400 hover:text-red-400 text-[10px] leading-none px-0.5;
+}
+
+.chat-panel__tab-new {
+  @apply px-2 py-1.5 text-zinc-500 hover:text-zinc-200 text-sm shrink-0;
+}
+
+.chat-panel__session-streaming {
+  @apply text-orange-400 text-lg leading-none;
+}
+
 .chat-panel__messages {
   @apply flex-1 overflow-y-auto p-4;
 }
