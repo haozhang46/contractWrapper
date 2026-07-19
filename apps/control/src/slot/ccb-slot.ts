@@ -1,10 +1,13 @@
-import { resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import type {
   AgentSlot,
   SlotEvent,
   SlotSessionConfig,
 } from '@harness/slot'
-import { getMacroDefines } from '../../../../ccb/scripts/defines.ts'
+import {
+  DEFAULT_BUILD_FEATURES,
+  getMacroDefines,
+} from '../../../../ccb/scripts/defines.ts'
 import { encodeJsonl, parseJsonlLine } from './jsonl.ts'
 
 export interface CcbSlotOptions {
@@ -40,8 +43,10 @@ export function resolveCcbBridgePath(): string {
 }
 
 /**
- * Default `bun` argv for the CCB bridge: MACRO.* `-d` defines + bridge path.
+ * Default `bun` argv for the CCB bridge: MACRO.* `-d` defines, `--feature`
+ * flags (same set as `ccb` `bun run dev`), then bridge path.
  * Without `-d`, bare `MACRO.VERSION` throws ReferenceError at runtime.
+ * Without `--feature EXTRACT_MEMORIES`, turn-end memory extract is compiled off.
  */
 export function defaultCcbSpawnArgs(
   bridgePath: string = resolveCcbBridgePath(),
@@ -50,7 +55,12 @@ export function defaultCcbSpawnArgs(
     '-d',
     `${k}:${v}`,
   ])
-  return [...defineArgs, bridgePath]
+  const envFeatures = Object.entries(process.env)
+    .filter(([k, v]) => k.startsWith('FEATURE_') && v === '1')
+    .map(([k]) => k.replace('FEATURE_', ''))
+  const allFeatures = [...new Set([...DEFAULT_BUILD_FEATURES, ...envFeatures])]
+  const featureArgs = allFeatures.flatMap(name => ['--feature', name])
+  return [...defineArgs, ...featureArgs, bridgePath]
 }
 
 function defaultEnv(workspaceRoot: string): Record<string, string> {
@@ -61,6 +71,8 @@ function defaultEnv(workspaceRoot: string): Record<string, string> {
     HARNESS_CONTROL_MCP: 'stdio',
     HARNESS_CONTROL_URL: `http://127.0.0.1:${port}`,
     HARNESS_WORKSPACE: workspaceRoot,
+    // CCB auto-memory → workspace .harness/memory (same store as harness UI JSON).
+    CLAUDE_COWORK_MEMORY_PATH_OVERRIDE: join(workspaceRoot, '.harness', 'memory'),
   }
 }
 

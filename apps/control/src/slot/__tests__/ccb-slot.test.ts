@@ -77,6 +77,18 @@ describe('CcbSlot', () => {
     expect(versionIdx).toBe(-1) // key is inside the -d value, not a bare arg
   })
 
+  test('defaultCcbSpawnArgs includes --feature EXTRACT_MEMORIES', () => {
+    const args = defaultCcbSpawnArgs()
+    const idx = args.indexOf('--feature')
+    expect(idx).toBeGreaterThanOrEqual(0)
+    expect(args.includes('EXTRACT_MEMORIES')).toBe(true)
+    const featureIdx = args.findIndex(
+      (a, i) => a === '--feature' && args[i + 1] === 'EXTRACT_MEMORIES',
+    )
+    expect(featureIdx).toBeGreaterThanOrEqual(0)
+    expect(featureIdx).toBeLessThan(args.length - 1) // before bridge path
+  })
+
   test('CcbSlot turn over stdio', async () => {
     const slot = createTestSlot()
     await slot.initSession({ workspaceRoot: '/tmp' })
