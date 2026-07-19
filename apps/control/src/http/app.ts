@@ -20,9 +20,11 @@ import { createSkillsRoutes } from './routes/skills.ts'
 export function createApp({
   workspaceRoot,
   pending = pendingStore,
+  onMcpChange,
 }: {
   workspaceRoot: string
   pending?: PendingStore
+  onMcpChange?: () => void
 }): Hono {
   loadOnion(workspaceRoot)
 
@@ -49,7 +51,7 @@ export function createApp({
     '/api/skill-factory',
     createSkillFactoryRoutes({ workspaceRoot }),
   )
-  app.route('/api/mcp', createMcpRoutes(workspaceRoot))
+  app.route('/api/mcp', createMcpRoutes(workspaceRoot, onMcpChange))
   app.route('/api/skills', createSkillsRoutes({ workspaceRoot }))
   return app
 }

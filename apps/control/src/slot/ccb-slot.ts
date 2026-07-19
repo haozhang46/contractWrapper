@@ -166,6 +166,20 @@ export class CcbSlot implements AgentSlot {
     }
   }
 
+  /**
+   * Reload MCP servers by killing idle workers.
+   * The next `sendMessageWithHistory` call will spawn a fresh CCB child that
+   * reads the updated `.mcp.json`. Busy workers continue their current turn.
+   */
+  reloadMcpServers(): void {
+    for (const worker of this.workers) {
+      if (!worker.busy && worker.child && !worker.child.killed) {
+        worker.child.kill()
+        worker.child = null
+      }
+    }
+  }
+
   /** Kill all child processes (tests / shutdown). Not part of AgentSlot. */
   dispose(): void {
     for (const item of this.queue.splice(0)) {

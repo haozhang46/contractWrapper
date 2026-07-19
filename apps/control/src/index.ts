@@ -7,6 +7,7 @@ import { installProcessErrorHandlers } from './bootstrap/installProcessErrorHand
 import { loadOnion } from './bootstrap/loadOnion.ts'
 import { resolveWorkspaceRoot } from './bootstrap/resolveWorkspaceRoot.ts'
 import { startControlMcpServer } from './mcp/server.ts'
+import { CcbSlot } from './slot/ccb-slot.ts'
 import { onionRuntime } from './onionSingleton.ts'
 import { pendingStore } from './pendingSingleton.ts'
 
@@ -20,7 +21,11 @@ loadOnion(workspaceRoot)
 discoverAndRegisterHeadlessMcp(workspaceRoot)
 
 const port = Number(process.env.CONTROL_PORT ?? 3100)
-const app = createApp({ workspaceRoot })
+const ccbSlot = new CcbSlot({ workspaceRoot })
+const app = createApp({
+  workspaceRoot,
+  onMcpChange: () => ccbSlot.reloadMcpServers(),
+})
 
 serve({
   port,

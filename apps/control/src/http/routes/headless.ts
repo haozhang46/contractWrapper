@@ -16,6 +16,7 @@ export function createHeadlessRoutes(workspaceRoot: string): Hono {
     const body = await c.req.json<Partial<HeadlessSettings>>()
     const saved = saveHeadlessSettings(workspaceRoot, {
       autoAllow: Boolean(body.autoAllow),
+      unsafeMode: Boolean(body.unsafeMode),
     })
     return c.json(saved)
   })
