@@ -6,6 +6,13 @@ import {
   markAssistantComplete,
 } from './applyChatStreamEvent'
 import { deriveChatStatus } from './deriveChatStatus'
+import { listSkills, type SkillListItem } from './skillsApi'
+import SlashSkillPicker from './SlashSkillPicker'
+import {
+  applySlashInsert,
+  filterSkills,
+  parseSlashQuery,
+} from './slashSkill'
 
 export default function ChatPanel(): ReactElement {
   const [sessions, setSessions] = useState<SessionMetaDTO[]>([])
@@ -17,8 +24,67 @@ export default function ChatPanel(): ReactElement {
   const [composing, setComposing] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [memToast, setMemToast] = useState('')
+  const [enabledSkills, setEnabledSkills] = useState<SkillListItem[]>([])
+  const [slashIndex, setSlashIndex] = useState(0)
+  const [slashDismissed, setSlashDismissed] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+
+  const slashQuery = parseSlashQuery(input)
+  const slashOpen = Boolean(slashQuery?.active) && !slashDismissed
+  const filteredSkills = slashQuery
+    ? filterSkills(
+        enabledSkills.map((s) => ({
+          name: s.name,
+          description: s.description,
+        })),
+        slashQuery.filter,
+      )
+    : []
+
+  const refreshEnabledSkills = useCallback(async function refreshEnabledSkills() {
+    try {
+      const result = await listSkills({ enabledOnly: true })
+      if (result.ok) setEnabledSkills(result.data)
+    } catch {
+      // picker is best-effort; chat still works without it
+    }
+  }, [])
+
+  useEffect(function loadEnabledSkillsOnMount() {
+    void refreshEnabledSkills()
+  }, [refreshEnabledSkills])
+
+  useEffect(function refreshSkillsWhenPickerOpens() {
+    if (slashOpen) void refreshEnabledSkills()
+  }, [slashOpen, refreshEnabledSkills])
+
+  useEffect(function resetSlashIndex() {
+    setSlashIndex(0)
+    setSlashDismissed(false)
+  }, [slashQuery?.filter, slashQuery?.active])
+
+  useEffect(function clampSlashIndex() {
+    if (filteredSkills.length === 0) {
+      setSlashIndex(0)
+      return
+    }
+    setSlashIndex((i) => Math.min(i, filteredSkills.length - 1))
+  }, [filteredSkills.length])
+
+  const selectSlashSkill = useCallback(
+    function selectSlashSkill(name: string) {
+      setInput((prev) => {
+        const next = applySlashInsert(prev, name)
+        // Trailing space ends the slash token so the picker closes.
+        return parseSlashQuery(next) ? `${next} ` : next
+      })
+      setSlashDismissed(true)
+      requestAnimationFrame(() => inputRef.current?.focus())
+    },
+    [],
+  )
 
   useEffect(function scrollToBottom() {
     if (scrollRef.current) {
@@ -371,38 +437,78 @@ export default function ChatPanel(): ReactElement {
           </div>
         )}
         <div className="chat-panel__input-area">
-          <div className="chat-panel__input-row">
-            <input
-              type="text"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onCompositionStart={() => setComposing(true)}
-              onCompositionEnd={() => setComposing(false)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !composing && !streaming) void handleSend()
-              }}
-              placeholder={streaming ? statusLabel ?? 'Working…' : 'Type a message...'}
-              disabled={streaming}
-              className="chat-panel__input"
-            />
-            {streaming ? (
-              <button
-                type="button"
-                onClick={handleStop}
-                className="chat-panel__stop-btn"
-              >
-                Stop
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => void handleSend()}
-                disabled={!input.trim()}
-                className="chat-panel__send-btn"
-              >
-                Send
-              </button>
+          <div className="chat-panel__input-wrap">
+            {slashOpen && (
+              <SlashSkillPicker
+                skills={filteredSkills}
+                selectedIndex={slashIndex}
+                onSelect={selectSlashSkill}
+                onHover={setSlashIndex}
+              />
             )}
+            <div className="chat-panel__input-row">
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onCompositionStart={() => setComposing(true)}
+                onCompositionEnd={() => setComposing(false)}
+                onKeyDown={e => {
+                  if (slashOpen) {
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault()
+                      if (filteredSkills.length === 0) return
+                      setSlashIndex((i) => (i + 1) % filteredSkills.length)
+                      return
+                    }
+                    if (e.key === 'ArrowUp') {
+                      e.preventDefault()
+                      if (filteredSkills.length === 0) return
+                      setSlashIndex(
+                        (i) =>
+                          (i - 1 + filteredSkills.length) % filteredSkills.length,
+                      )
+                      return
+                    }
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      if (!composing && filteredSkills[slashIndex]) {
+                        selectSlashSkill(filteredSkills[slashIndex].name)
+                      }
+                      return
+                    }
+                    if (e.key === 'Escape') {
+                      e.preventDefault()
+                      setSlashDismissed(true)
+                      return
+                    }
+                  }
+                  if (e.key === 'Enter' && !composing && !streaming) void handleSend()
+                }}
+                placeholder={streaming ? statusLabel ?? 'Working…' : 'Type a message...'}
+                disabled={streaming}
+                className="chat-panel__input"
+              />
+              {streaming ? (
+                <button
+                  type="button"
+                  onClick={handleStop}
+                  className="chat-panel__stop-btn"
+                >
+                  Stop
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void handleSend()}
+                  disabled={!input.trim()}
+                  className="chat-panel__send-btn"
+                >
+                  Send
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
