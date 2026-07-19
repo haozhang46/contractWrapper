@@ -72,6 +72,7 @@ export interface ApiMemoryEntry {
 
 export interface ApiHeadlessSettings {
   autoAllow: boolean
+  unsafeMode: boolean
 }
 
 export interface ApiPendingResponse {

@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import type { ChatMessage } from '../../types/chat'
-import { applyChatStreamEvent } from '../applyChatStreamEvent'
+import {
+  applyChatStreamEvent,
+  finalizeChatStream,
+} from '../applyChatStreamEvent'
 
 function assistant(content: string): ChatMessage {
   return {
@@ -90,5 +93,51 @@ describe('applyChatStreamEvent', () => {
     expect(next[0]?.content).toContain('[Error: boom]')
     expect(prev[0]?.status).toBe('streaming')
     expect(prev[0]?.content).toBe('partial')
+  })
+})
+
+describe('finalizeChatStream', () => {
+  test('marks complete when stream received [DONE]', () => {
+    const prev = [assistant('hello')]
+    const next = finalizeChatStream(prev, {
+      receivedDone: true,
+      aborted: false,
+    })
+    expect(next[0]?.status).toBe('complete')
+    expect(next[0]?.content).toBe('hello')
+  })
+
+  test('marks interrupted when stream ends without [DONE]', () => {
+    const prev = [assistant('partial')]
+    const next = finalizeChatStream(prev, {
+      receivedDone: false,
+      aborted: false,
+    })
+    expect(next[0]?.status).toBe('error')
+    expect(next[0]?.content).toContain('partial')
+    expect(next[0]?.content).toContain('连接中断')
+    expect(prev[0]?.status).toBe('streaming')
+    expect(prev[0]?.content).toBe('partial')
+  })
+
+  test('shows interrupt notice when empty stream drops', () => {
+    const prev = [assistant('')]
+    const next = finalizeChatStream(prev, {
+      receivedDone: false,
+      aborted: false,
+    })
+    expect(next[0]?.status).toBe('error')
+    expect(next[0]?.content).toContain('连接中断')
+  })
+
+  test('user abort keeps stopped placeholder without interrupt notice', () => {
+    const prev = [assistant('')]
+    const next = finalizeChatStream(prev, {
+      receivedDone: false,
+      aborted: true,
+    })
+    expect(next[0]?.status).toBe('complete')
+    expect(next[0]?.content).toBe('(stopped)')
+    expect(next[0]?.content).not.toContain('连接中断')
   })
 })

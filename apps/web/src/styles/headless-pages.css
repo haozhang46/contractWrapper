@@ -82,3 +82,163 @@
   margin-top: 8px;
   padding-top: 4px;
 }
+
+/* ── Wiki Markdown Viewer ───────────────────────────── */
+.wiki-markdown__container {
+  background: #18181b;
+  border: 1px solid #3f3f46;
+  border-radius: 8px;
+  padding: 20px 24px;
+  max-height: 70vh;
+  overflow-y: auto;
+  line-height: 1.7;
+  font-size: 14px;
+  color: #e4e4e7;
+}
+
+.wiki-markdown__container h1,
+.wiki-markdown__container h2,
+.wiki-markdown__container h3,
+.wiki-markdown__container h4,
+.wiki-markdown__container h5,
+.wiki-markdown__container h6 {
+  color: #f4f4f5;
+  font-weight: 600;
+  margin: 1.2em 0 0.5em;
+  line-height: 1.3;
+}
+
+.wiki-markdown__container h1 { font-size: 1.6em; border-bottom: 1px solid #3f3f46; padding-bottom: 0.3em; }
+.wiki-markdown__container h2 { font-size: 1.35em; border-bottom: 1px solid #3f3f46; padding-bottom: 0.25em; }
+.wiki-markdown__container h3 { font-size: 1.2em; }
+.wiki-markdown__container h4 { font-size: 1.1em; }
+.wiki-markdown__container h5 { font-size: 1em; }
+.wiki-markdown__container h6 { font-size: 0.9em; color: #a1a1aa; }
+
+.wiki-markdown__paragraph {
+  margin: 0.6em 0;
+}
+
+.wiki-markdown__inline-code {
+  background: #27272a;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  color: #D77757;
+}
+
+.wiki-markdown__code-block {
+  background: #09090b;
+  border: 1px solid #3f3f46;
+  border-radius: 6px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0.8em 0;
+}
+
+.wiki-markdown__code-block code {
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  color: #e4e4e7;
+}
+
+.wiki-markdown__link {
+  color: #93c5fd;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.wiki-markdown__link:hover {
+  color: #bfdbfe;
+}
+
+.wiki-markdown__hr {
+  border: none;
+  border-top: 1px solid #3f3f46;
+  margin: 1.2em 0;
+}
+
+.wiki-markdown__container ul,
+.wiki-markdown__container ol {
+  margin: 0.4em 0;
+  padding-left: 1.8em;
+}
+
+.wiki-markdown__container li {
+  margin: 0.2em 0;
+}
+
+.wiki-markdown__container strong {
+  color: #f4f4f5;
+  font-weight: 600;
+}
+
+.wiki-markdown__container em {
+  font-style: italic;
+}
+
+.wiki-markdown__container del {
+  color: #71717a;
+  text-decoration: line-through;
+}
+
+.wiki-markdown__container blockquote {
+  border-left: 3px solid #D77757;
+  padding-left: 12px;
+  margin: 0.8em 0;
+  color: #a1a1aa;
+}
+
+/* ── Wiki Browse List ──────────────────────────────────── */
+.wiki-browse__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wiki-browse__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: #18181b;
+  border: 1px solid #3f3f46;
+  border-radius: 6px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.wiki-browse__item:hover {
+  background: #27272a;
+  border-color: #D77757;
+}
+
+.wiki-browse__item-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #e4e4e7;
+  margin-bottom: 2px;
+}
+
+.wiki-browse__item-preview {
+  font-size: 12px;
+  color: #71717a;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Scrollbar styling for the markdown container */
+.wiki-markdown__container::-webkit-scrollbar {
+  width: 6px;
+}
+.wiki-markdown__container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.wiki-markdown__container::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 3px;
+}

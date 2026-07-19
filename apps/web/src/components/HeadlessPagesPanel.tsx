@@ -1,8 +1,15 @@
 import { useState, useEffect, useCallback, type ReactElement } from 'react'
 import DynamicForm, { type PageSchema } from './DynamicForm'
+import MarkdownRenderer from './MarkdownRenderer'
 
 interface PageMeta { id: string; description: string; pageid: string; hasSchema: boolean }
 interface PageResult { status: string; page: string; method: string; url: string; message?: string }
+
+interface BrowseFile {
+  path: string
+  name: string
+  preview: string
+}
 
 interface HeadlessPagesPanelProps {
   /** When set, opens the page directly. When null, shows page list. */
@@ -19,6 +26,8 @@ export default function HeadlessPagesPanel({ selectedPageId, onPageSelect }: Hea
   const [schemaLoading, setSchemaLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<PageResult | null>(null)
+  const [previewFile, setPreviewFile] = useState<Record<string, unknown> | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
@@ -51,6 +60,20 @@ export default function HeadlessPagesPanel({ selectedPageId, onPageSelect }: Hea
       .catch(() => { if (!cancelled) setSchemaLoading(false) })
     return () => { cancelled = true }
   }, [activePage])
+
+  const readFileFromBrowse = useCallback(async (filePath: string) => {
+    setPreviewLoading(true); setPreviewFile(null)
+    try {
+      const res = await fetch('/api/headless/pages/wiki-read/execute', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ formData: { path: filePath } }),
+      })
+      const data = res.ok ? await res.json() : { error: `Error ${res.status}`, path: filePath }
+      setPreviewFile(data)
+    } catch (err) {
+      setPreviewFile({ error: String(err), path: filePath })
+    } finally { setPreviewLoading(false) }
+  }, [])
 
   const handleSubmit = useCallback(async (formData: Record<string, unknown>) => {
     if (!activePage) return
@@ -97,15 +120,93 @@ export default function HeadlessPagesPanel({ selectedPageId, onPageSelect }: Hea
     )
   }
 
-  // Form / result views (shown in main area)
-  if (result) return (
-    <div className="headless-pages__main">
-      <button type="button" onClick={goBack} className="text-sm text-zinc-400 hover:text-zinc-200 mb-2">← Back</button>
-      <h3 className="text-sm font-semibold text-zinc-300 mb-2">Result</h3>
-      <pre className="text-xs bg-zinc-800 p-3 rounded overflow-auto max-h-60">{JSON.stringify(result, null, 2)}</pre>
-      <button type="button" onClick={goBack} className="mt-2 text-sm text-zinc-400 hover:text-zinc-200">Submit Another</button>
-    </div>
-  )
+  // ── File preview from browse ────────────────────────────
+  if (previewFile) {
+    const isMd = previewFile.format === 'markdown'
+    const mdContent = isMd ? (previewFile.content as string) ?? '' : ''
+
+    return (
+      <div className="headless-pages__main">
+        <button type="button" onClick={() => setPreviewFile(null)} className="text-sm text-zinc-400 hover:text-zinc-200 mb-2">
+          ← Back to browse results
+        </button>
+        <h3 className="text-sm font-semibold text-zinc-300 mb-2">
+          {previewFile.path as string}
+        </h3>
+        {isMd ? (
+          <>
+            <div className="text-xs text-zinc-500 mb-3">
+              {(previewFile.size as number) ?? 0} bytes
+            </div>
+            <div className="wiki-markdown__container">
+              <MarkdownRenderer content={mdContent} />
+            </div>
+          </>
+        ) : previewFile.error ? (
+          <p className="text-red-400 text-sm">{(previewFile.error as string)}</p>
+        ) : (
+          <pre className="text-xs bg-zinc-800 p-3 rounded overflow-auto max-h-60">
+            {JSON.stringify(previewFile, null, 2)}
+          </pre>
+        )}
+      </div>
+    )
+  }
+
+  // ── Show result ─────────────────────────────────────────
+  if (result) {
+    const resultData = result as unknown as Record<string, unknown>
+    const isBrowseResult = typeof result === 'object' && result !== null && 'files' in result
+    const isMarkdown = resultData.format === 'markdown' || resultData.type === 'markdown'
+    const mdContent = isMarkdown ? (resultData.content as string) ?? '' : ''
+
+    // Browse results → render as clickable file list
+    if (isBrowseResult) {
+      const browseData = result as unknown as { category: string; count: number; files: BrowseFile[] }
+      return (
+        <div className="headless-pages__main">
+          <button type="button" onClick={goBack} className="text-sm text-zinc-400 hover:text-zinc-200 mb-2">← Back</button>
+          <h3 className="text-sm font-semibold text-zinc-300 mb-1">Browse: {browseData.category}</h3>
+          <p className="text-xs text-zinc-500 mb-3">{browseData.count} article{browseData.count !== 1 ? 's' : ''}</p>
+          {previewLoading && (
+            <p className="text-sm text-zinc-500 mb-2">Loading file...</p>
+          )}
+          <div className="wiki-browse__list">
+            {browseData.files.map(f => (
+              <button key={f.path} type="button" onClick={() => readFileFromBrowse(f.path)}
+                className="wiki-browse__item">
+                <div className="wiki-browse__item-name">{f.name}</div>
+                <div className="wiki-browse__item-preview">{f.preview}</div>
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={goBack} className="mt-3 text-sm text-zinc-400 hover:text-zinc-200">Submit Another</button>
+        </div>
+      )
+    }
+
+    return (
+      <div className="headless-pages__main">
+        <button type="button" onClick={goBack} className="text-sm text-zinc-400 hover:text-zinc-200 mb-2">← Back</button>
+        <h3 className="text-sm font-semibold text-zinc-300 mb-2">Result</h3>
+        {isMarkdown ? (
+          <>
+            <div className="text-xs text-zinc-500 mb-3">
+              {(result as unknown as Record<string, unknown>).path as string}
+              <span className="mx-1">·</span>
+              {(result as unknown as Record<string, string>).size} bytes
+            </div>
+            <div className="wiki-markdown__container">
+              <MarkdownRenderer content={mdContent} />
+            </div>
+          </>
+        ) : (
+          <pre className="text-xs bg-zinc-800 p-3 rounded overflow-auto max-h-60">{JSON.stringify(result, null, 2)}</pre>
+        )}
+        <button type="button" onClick={goBack} className="mt-2 text-sm text-zinc-400 hover:text-zinc-200">Submit Another</button>
+      </div>
+    )
+  }
 
   if (schemaLoading) return (
     <div className="headless-pages__main">

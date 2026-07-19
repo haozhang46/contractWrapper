@@ -3,6 +3,7 @@ import type { ChatMessage, ToolCallEvent } from '../types/chat'
 import { toSessionMetaList, toSessionDetail, type SessionMetaDTO } from '../mappers/chat-sessions'
 import {
   applyChatStreamEvent,
+  finalizeChatStream,
   markAssistantComplete,
 } from './applyChatStreamEvent'
 import { deriveChatStatus } from './deriveChatStatus'
@@ -350,6 +351,7 @@ export default function ChatPanel(): ReactElement {
       const decoder = new TextDecoder()
       let buffer = ''
       let fullContent = ''
+      let receivedDone = false
 
       while (true) {
         const { done, value } = await reader.read()
@@ -361,6 +363,7 @@ export default function ChatPanel(): ReactElement {
           if (!line.startsWith('data: ')) continue
           const data = line.slice(6)
           if (data === '[DONE]') {
+            receivedDone = true
             patchLive(markAssistantComplete(live))
             break
           }
@@ -379,28 +382,17 @@ export default function ChatPanel(): ReactElement {
             // ignore malformed stream chunks
           }
         }
+        if (receivedDone) break
       }
 
-      if (ac.signal.aborted) {
-        const last = live[live.length - 1]
-        if (last?.role === 'assistant') {
-          const stopped = [
-            ...live.slice(0, -1),
-            {
-              ...last,
-              status: 'complete' as const,
-              content: last.content || '(stopped)',
-            },
-          ]
-          patchLive(stopped)
-          void saveSession(tabId, stopped)
-        }
-        return
-      }
-
-      live = markAssistantComplete(live)
+      live = finalizeChatStream(live, {
+        receivedDone,
+        aborted: ac.signal.aborted,
+      })
       patchLive(live)
       void saveSession(tabId, live)
+
+      if (ac.signal.aborted || !receivedDone) return
 
       fetch('/api/memory/extract', {
         method: 'POST',
@@ -423,26 +415,31 @@ export default function ChatPanel(): ReactElement {
         .catch(() => {})
     } catch (err) {
       if (ac.signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
-        const last = live[live.length - 1]
-        if (last?.role === 'assistant') {
-          const stopped = [
-            ...live.slice(0, -1),
-            {
-              ...last,
-              status: 'complete' as const,
-              content: last.content || '(stopped)',
-            },
-          ]
-          patchLive(stopped)
-          void saveSession(tabId, stopped)
-        }
+        live = finalizeChatStream(live, {
+          receivedDone: false,
+          aborted: true,
+        })
+        patchLive(live)
+        void saveSession(tabId, live)
       } else {
-        patchLive(
-          applyChatStreamEvent(live, {
-            type: 'error',
-            message: String(err),
-          }),
-        )
+        // Network drop mid-fetch (e.g. control process restart) often surfaces
+        // as TypeError / Failed to fetch rather than a clean abort.
+        const msg = err instanceof Error ? err.message : String(err)
+        const looksLikeDrop =
+          /failed to fetch|networkerror|load failed|econnrefused|connection/i.test(
+            msg,
+          )
+        live = looksLikeDrop
+          ? finalizeChatStream(live, {
+              receivedDone: false,
+              aborted: false,
+            })
+          : applyChatStreamEvent(live, {
+              type: 'error',
+              message: msg,
+            })
+        patchLive(live)
+        void saveSession(tabId, live)
       }
     } finally {
       if (abortByTabRef.current.get(tabId) === ac) {

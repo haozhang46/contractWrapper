@@ -61,3 +61,44 @@ export function markAssistantComplete(messages: ChatMessage[]): ChatMessage[] {
   if (!last || last.role !== 'assistant') return messages
   return [...messages.slice(0, -1), { ...last, status: 'complete' }]
 }
+
+const STREAM_INTERRUPT_NOTICE =
+  '⚠️ 连接中断（服务可能已重启），请重发或刷新后继续'
+
+/**
+ * Finalize an in-flight assistant turn after the SSE reader exits.
+ * Distinguishes clean [DONE], user abort, and silent drop (e.g. control --watch restart).
+ */
+export function finalizeChatStream(
+  messages: ChatMessage[],
+  opts: { receivedDone: boolean; aborted: boolean },
+): ChatMessage[] {
+  const last = messages[messages.length - 1]
+  if (!last || last.role !== 'assistant') return messages
+
+  if (opts.aborted) {
+    return [
+      ...messages.slice(0, -1),
+      {
+        ...last,
+        status: 'complete',
+        content: last.content || '(stopped)',
+      },
+    ]
+  }
+
+  if (opts.receivedDone) {
+    return markAssistantComplete(messages)
+  }
+
+  return [
+    ...messages.slice(0, -1),
+    {
+      ...last,
+      status: 'error',
+      content: last.content
+        ? `${last.content}\n\n${STREAM_INTERRUPT_NOTICE}`
+        : STREAM_INTERRUPT_NOTICE,
+    },
+  ]
+}
