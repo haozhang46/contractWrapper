@@ -1,0 +1,26 @@
+---
+description: Superpowers gate — spec/plan human approval before implementation
+alwaysApply: true
+---
+
+# Superpowers Workflow Gate
+
+For multi-step features, behavior changes, or new subsystems:
+
+1. **Brainstorm → design** (skill: brainstorming). Get section approval.
+2. **Write spec** to `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`. Wait for user to approve the written spec.
+3. **Write plan** (skill: writing-plans) to `docs/superpowers/plans/YYYY-MM-DD-<name>.md`. Self-review, then offer execution options only.
+4. **STOP.** Do not implement until the user explicitly approves in chat (e.g. 「批准」「用 1」「subagent-driven」「inline」).
+5. After approval: default **subagent-driven-development**; use **executing-plans** only if user chose inline.
+
+## Auto-allow ≠ approval
+
+Cursor/tool auto-allow only skips permission clicks for tools. It does **not** approve a plan.
+
+- After presenting plan options: **end the turn**. No Write/StrReplace/Shell that implements tasks.
+- Never treat silence, auto-run, or prior tool approvals as plan approval.
+- Skip this gate only for: pure Q&A, single-line typo/fix with clear user ask, or user says 「跳过 plan / 直接改」.
+
+## Skip / exempt
+
+Trivial one-shot edits the user already specified exactly may proceed without a plan. When unsure, ask.
