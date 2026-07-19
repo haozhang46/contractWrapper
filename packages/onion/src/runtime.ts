@@ -1,9 +1,9 @@
 import type { ContractOnion, OnionLayerConfig } from '@harness/protocol'
+import { classifyToolCapability } from './classifyToolCapability.ts'
 import { DEFAULT_ONION_LAYERS } from './defaultLayers.ts'
 import type {
   AuditEntry,
   EvaluateResult,
-  LayerDecision,
   OnionEvaluateContext,
   OnionMiddleware,
 } from './types.ts'
@@ -149,7 +149,7 @@ export class OnionRuntime {
     _layer: OnionLayerConfig,
   ): OnionMiddleware {
     return async (ctx, next) => {
-      const toolCapabilityLevel = this.classifyToolCapability(ctx.toolName)
+      const toolCapabilityLevel = classifyToolCapability(ctx.toolName)
 
       if (toolCapabilityLevel === 'L1') {
         await next()
@@ -197,37 +197,4 @@ export class OnionRuntime {
     }
   }
 
-  private classifyToolCapability(toolName: string): 'L1' | 'L2' | 'L3' {
-    const L1_TOOLS = new Set([
-      'FileRead',
-      'Read',
-      'FileWrite',
-      'FileEdit',
-      'Glob',
-      'Grep',
-      'TaskCreate',
-      'TaskUpdate',
-      'TaskList',
-      'TaskGet',
-      'EnterPlanMode',
-      'ExitPlanModeV2',
-    ])
-    const L3_TOOLS = new Set([
-      'Bash',
-      'PowerShell',
-      'REPL',
-      'Agent',
-      'WebFetch',
-      'WebSearch',
-      'CronCreate',
-      'CronDelete',
-      'Skill',
-      'MCP',
-      'EnterWorktree',
-      'ExitWorktree',
-    ])
-    if (L3_TOOLS.has(toolName)) return 'L3'
-    if (L1_TOOLS.has(toolName)) return 'L1'
-    return 'L2'
-  }
 }
