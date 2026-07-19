@@ -1,9 +1,10 @@
-import { join, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import type {
   AgentSlot,
   SlotEvent,
   SlotSessionConfig,
 } from '@harness/slot'
+import { getMacroDefines } from '../../../../ccb/scripts/defines.ts'
 import { encodeJsonl, parseJsonlLine } from './jsonl.ts'
 
 export interface CcbSlotOptions {
@@ -36,6 +37,20 @@ export function resolveCcbBridgePath(): string {
   }
   // This file: apps/control/src/slot → monorepo root is ../../../..
   return resolve(import.meta.dir, '../../../../ccb/src/harness/stdioBridge.ts')
+}
+
+/**
+ * Default `bun` argv for the CCB bridge: MACRO.* `-d` defines + bridge path.
+ * Without `-d`, bare `MACRO.VERSION` throws ReferenceError at runtime.
+ */
+export function defaultCcbSpawnArgs(
+  bridgePath: string = resolveCcbBridgePath(),
+): string[] {
+  const defineArgs = Object.entries(getMacroDefines()).flatMap(([k, v]) => [
+    '-d',
+    `${k}:${v}`,
+  ])
+  return [...defineArgs, bridgePath]
 }
 
 function defaultEnv(workspaceRoot: string): Record<string, string> {
@@ -279,8 +294,7 @@ export class CcbSlot implements AgentSlot {
     }
 
     const command = this.opts.spawnCommand ?? process.execPath
-    const args =
-      this.opts.spawnArgs ?? [resolveCcbBridgePath()]
+    const args = this.opts.spawnArgs ?? defaultCcbSpawnArgs()
     const cwd = this.opts.cwd ?? workspaceRoot
     const env: Record<string, string | undefined> = {
       ...process.env,
