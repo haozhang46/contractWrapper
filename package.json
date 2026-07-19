@@ -7,7 +7,7 @@
     "web:dev": "bun run --filter @harness/web dev",
     "control:dev": "bun run --filter @harness/control dev",
     "agent:dev": "bun run scripts/agent-dev.ts",
-    "test": "bun test packages apps/control apps/web",
+    "test": "bun test packages apps/control apps/web scripts",
     "typecheck": "bun run --filter '*' typecheck"
   },
   "devDependencies": {
