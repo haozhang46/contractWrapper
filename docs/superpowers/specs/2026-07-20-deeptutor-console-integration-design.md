@@ -1,7 +1,7 @@
 # DeepTutor × Harness Console 集成
 
 **日期：** 2026-07-20  
-**状态：** Draft（待用户确认书面 spec）  
+**状态：** Approved（2026-07-20）  
 **宿主：** `harness-console`  
 **外部系统：** [HKUDS/DeepTutor](https://github.com/HKUDS/DeepTutor)（Lifelong Personalized Tutoring）  
 **范围：** Chat 极简 MCP 控制面（`status` + `run`）+ Widgets iframe 看板 Tab  
