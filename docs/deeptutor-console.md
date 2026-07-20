@@ -24,17 +24,14 @@ deeptutor start
 
 ### 注册 `.mcp.json`
 
-仓库根目录的 `.mcp.json` 已提交示例条目。其中 `args` 使用 **本机 monorepo 根的绝对路径**；clone 到其他目录后，请把路径改成你机器上的 harness-console 根路径（`harness-headless` 与 `deeptutor` 两条 server 同理）。
+仓库根目录的 `.mcp.json` 已提交示例条目。`args` 为 **相对仓库根** 的路径；Cursor/MCP 的工作目录应为 harness-console 根（在仓库根打开工作区即可）。
 
 ```json
 {
   "mcpServers": {
     "deeptutor": {
       "command": "bun",
-      "args": [
-        "run",
-        "/absolute/path/to/harness-console/libs/deeptutor-bridge/src/mcp-server.ts"
-      ],
+      "args": ["run", "libs/deeptutor-bridge/src/mcp-server.ts"],
       "env": {}
     }
   }

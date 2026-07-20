@@ -2,20 +2,12 @@
   "mcpServers": {
     "harness-headless": {
       "command": "bun",
-      "args": [
-        "run",
-        "/Users/hz/Desktop/fe/harness-console/libs/harness-headless-connect/src/mcp-server.ts"
-      ],
-      "env": {
-        "WIKI_DIR": "/Users/hz/Desktop/fe/harness-console/docs/wiki"
-      }
+      "args": ["run", "libs/harness-headless-connect/src/mcp-server.ts"],
+      "env": { "WIKI_DIR": "docs/wiki" }
     },
     "deeptutor": {
       "command": "bun",
-      "args": [
-        "run",
-        "/Users/hz/Desktop/fe/harness-console/libs/deeptutor-bridge/src/mcp-server.ts"
-      ],
+      "args": ["run", "libs/deeptutor-bridge/src/mcp-server.ts"],
       "env": {}
     }
   }
