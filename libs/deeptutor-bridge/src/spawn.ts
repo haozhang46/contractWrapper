@@ -45,7 +45,9 @@ export const defaultCliRunner: CliRunner = async (argv, opts) => {
     }
     throw e
   }
+  let killedForTimeout = false
   const timer = setTimeout(() => {
+    killedForTimeout = true
     try {
       proc.kill()
     } catch {
@@ -58,6 +60,9 @@ export const defaultCliRunner: CliRunner = async (argv, opts) => {
       new Response(proc.stderr).text(),
       proc.exited,
     ])
+    if (killedForTimeout) {
+      throw Object.assign(new Error('timed out'), { code: 'TIMEOUT' })
+    }
     if (exitCode === null) {
       throw Object.assign(new Error('timed out'), { code: 'TIMEOUT' })
     }

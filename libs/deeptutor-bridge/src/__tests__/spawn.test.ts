@@ -1,5 +1,29 @@
 import { describe, expect, test } from 'bun:test'
-import { probeStatus, runCapability, type CliRunner } from '../spawn.ts'
+import {
+  defaultCliRunner,
+  probeStatus,
+  runCapability,
+  type CliRunner,
+} from '../spawn.ts'
+
+describe('defaultCliRunner', () => {
+  test('TIMEOUT when process exceeds timeoutMs', async () => {
+    const prev = process.env.DEEPTUTOR_BIN
+    process.env.DEEPTUTOR_BIN = 'bun'
+    try {
+      await defaultCliRunner(['-e', 'await Bun.sleep(30000)'], {
+        timeoutMs: 200,
+        env: process.env,
+      })
+      throw new Error('expected throw')
+    } catch (e) {
+      expect((e as { code?: string }).code).toBe('TIMEOUT')
+    } finally {
+      if (prev === undefined) delete process.env.DEEPTUTOR_BIN
+      else process.env.DEEPTUTOR_BIN = prev
+    }
+  })
+})
 
 describe('probeStatus', () => {
   test('CLI_NOT_FOUND when runner fails to start', async () => {
