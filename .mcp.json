@@ -4,7 +4,7 @@
       "command": "bun",
       "args": [
         "run",
-        "/Users/hz/Desktop/fe/harness-console/.worktrees/feat-deeptutor-console/libs/harness-headless-connect/src/mcp-server.ts"
+        "/Users/hz/Desktop/fe/harness-console/libs/harness-headless-connect/src/mcp-server.ts"
       ],
       "env": {
         "WIKI_DIR": "/Users/hz/Desktop/fe/harness-console/docs/wiki"
@@ -14,7 +14,7 @@
       "command": "bun",
       "args": [
         "run",
-        "/Users/hz/Desktop/fe/harness-console/.worktrees/feat-deeptutor-console/libs/deeptutor-bridge/src/mcp-server.ts"
+        "/Users/hz/Desktop/fe/harness-console/libs/deeptutor-bridge/src/mcp-server.ts"
       ],
       "env": {}
     }
