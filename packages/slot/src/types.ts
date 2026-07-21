@@ -35,3 +35,18 @@ export interface AgentSlot {
    */
   abort(signal?: AbortSignal): void
 }
+
+/** Generic bidirectional message transport for any slot type */
+export interface SlotTransport {
+  send(msg: unknown): void
+  onMessage(cb: (msg: unknown) => void): void
+  close(): void
+}
+
+/** Base interface for all slots — harness-console discovers these via slots.yaml */
+export interface Slot {
+  readonly type: string
+  readonly name: string
+  connect(): Promise<SlotTransport>
+  destroy(): Promise<void>
+}
