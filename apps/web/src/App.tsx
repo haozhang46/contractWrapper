@@ -5,6 +5,7 @@ import ConfirmBanner from './components/ConfirmBanner'
 import SettingsPanel from './components/SettingsPanel'
 import SkillsPanel from './components/SkillsPanel'
 import { captureComponentError } from './monitoring/error-reporting'
+import { isChatPanelHidden, isNonChatShellTab } from './shellChatVisibility'
 import { type ShellTab } from './shellTabs'
 
 export default function App(): ReactElement {
@@ -48,15 +49,17 @@ export default function App(): ReactElement {
         </header>
 
         <main className="shell__main">
-          {activeTab === 'chat' ? (
+          {/* Keep Chat mounted so open tabs / stream state survive shell tab switches. */}
+          <div className="shell__panel" hidden={isChatPanelHidden(activeTab)}>
             <ChatPanel />
-          ) : activeTab === 'settings' ? (
+          </div>
+          {activeTab === 'settings' ? (
             <SettingsPanel />
           ) : activeTab === 'skills' ? (
             <SkillsPanel />
-          ) : (
+          ) : isNonChatShellTab(activeTab) ? (
             widgets.find((widget) => widget.id === activeTab)?.mount() ?? null
-          )}
+          ) : null}
         </main>
         <ConfirmBanner />
       </div>

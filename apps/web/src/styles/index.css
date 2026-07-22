@@ -51,6 +51,14 @@
   @apply flex-1 overflow-hidden;
 }
 
+.shell__panel {
+  @apply h-full;
+}
+
+.shell__panel[hidden] {
+  display: none;
+}
+
 /* ============================================================
    Chat Panel
    ============================================================ */
