@@ -15,6 +15,7 @@ import {
   parseSlashQuery,
 } from './slashSkill'
 import HeadlessPagesPanel from './HeadlessPagesPanel'
+import { randomId } from '../lib/randomId'
 
 type OpenTab = {
   id: string
@@ -31,7 +32,7 @@ function mapMessagesFromDetail(
   }>,
 ): ChatMessage[] {
   return detailMessages.map(m => ({
-    id: crypto.randomUUID(),
+    id: randomId(),
     role: m.role as ChatMessage['role'],
     content: m.content,
     timestamp: new Date().toISOString(),
@@ -303,14 +304,14 @@ export default function ChatPanel(): ReactElement {
     if (!tab || tab.streaming) return
 
     const userMsg: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: randomId(),
       role: 'user',
       content: input.trim(),
       timestamp: new Date().toISOString(),
       status: 'complete',
     }
     const assistantMsg: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: randomId(),
       role: 'assistant',
       content: '',
       timestamp: new Date().toISOString(),
