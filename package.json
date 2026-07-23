@@ -4,6 +4,7 @@
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "dev": "bun run scripts/dev.ts",
+    "dev:3101": "CONTROL_PORT=3101 bun run scripts/dev.ts",
     "web:dev": "bun run --filter @harness/web dev",
     "control:dev": "bun run --filter @harness/control dev",
     "agent:dev": "bun run scripts/agent-dev.ts",
