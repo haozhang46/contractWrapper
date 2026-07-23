@@ -8,9 +8,19 @@ export default function LLMSettings(): ReactElement {
 
   useEffect(function loadLLMSettings() {
     fetch('/api/llm')
-      .then(r => r.json())
-      .then((data: LLMSettingsDTO) => setSettings(toLLMSettings(data)))
-      .catch(() => {})
+      .then(async r => {
+        if (!r.ok) throw new Error(`GET /api/llm ${r.status}`)
+        return r.json() as Promise<LLMSettingsDTO>
+      })
+      .then(data => setSettings(toLLMSettings(data)))
+      .catch(() =>
+        setSettings({
+          provider: 'openai',
+          model: '',
+          baseUrl: '',
+          apiKey: '',
+        }),
+      )
   }, [])
 
   const save = async () => {
