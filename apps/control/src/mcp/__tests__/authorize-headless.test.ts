@@ -5,24 +5,18 @@ import { tmpdir } from 'node:os'
 import { PendingStore } from '../../pending/store.ts'
 import { handleAuthorize } from '../handlers.ts'
 
-function writeHeadless(
-  root: string,
-  settings: { autoAllow: boolean; unsafeMode?: boolean },
-) {
+function writeHeadless(root: string, settings: { autoAllow: boolean }) {
   mkdirSync(join(root, '.harness'), { recursive: true })
   writeFileSync(
     join(root, '.harness', 'headless.json'),
-    JSON.stringify({
-      autoAllow: settings.autoAllow,
-      unsafeMode: settings.unsafeMode ?? false,
-    }),
+    JSON.stringify({ autoAllow: settings.autoAllow }),
   )
 }
 
 describe('handleAuthorize headless autoAllow', () => {
-  test('L2 WebSearch ask auto-allows when autoAllow=true (no unsafeMode needed)', async () => {
+  test('L2 WebSearch ask auto-allows when autoAllow=true', async () => {
     const root = mkdtempSync(join(tmpdir(), 'harness-headless-l2-'))
-    writeHeadless(root, { autoAllow: true, unsafeMode: false })
+    writeHeadless(root, { autoAllow: true })
     const pending = new PendingStore({ defaultTimeoutMs: 60_000 })
     const result = await handleAuthorize(
       {
@@ -42,7 +36,7 @@ describe('handleAuthorize headless autoAllow', () => {
 
   test('deny is never bypassed by autoAllow', async () => {
     const root = mkdtempSync(join(tmpdir(), 'harness-headless-deny-'))
-    writeHeadless(root, { autoAllow: true, unsafeMode: true })
+    writeHeadless(root, { autoAllow: true })
     const pending = new PendingStore({ defaultTimeoutMs: 60_000 })
     const result = await handleAuthorize(
       {
@@ -62,7 +56,7 @@ describe('handleAuthorize headless autoAllow', () => {
 
   test('ask auto-allows when autoAllow=true', async () => {
     const root = mkdtempSync(join(tmpdir(), 'harness-headless-ask-'))
-    writeHeadless(root, { autoAllow: true, unsafeMode: false })
+    writeHeadless(root, { autoAllow: true })
     const pending = new PendingStore({ defaultTimeoutMs: 60_000 })
     const result = await handleAuthorize(
       {
@@ -82,7 +76,7 @@ describe('handleAuthorize headless autoAllow', () => {
 
   test('ask still needs_confirm when autoAllow is off', async () => {
     const root = mkdtempSync(join(tmpdir(), 'harness-headless-off-'))
-    writeHeadless(root, { autoAllow: false, unsafeMode: false })
+    writeHeadless(root, { autoAllow: false })
     const pending = new PendingStore({ defaultTimeoutMs: 60_000 })
     const result = await handleAuthorize(
       {

@@ -9,7 +9,7 @@ export default function HeadlessSettings(): ReactElement {
     fetch('/api/headless')
       .then(r => r.json())
       .then((data: HeadlessSettingsDTO) => setSettings(toHeadlessSettings(data)))
-      .catch(() => setSettings({ autoAllow: false, unsafeMode: false }))
+      .catch(() => setSettings({ autoAllow: false }))
   }, [])
 
   const save = async (next: HeadlessSettingsDTO) => {
@@ -57,34 +57,9 @@ export default function HeadlessSettings(): ReactElement {
           <p className="toggle-setting__desc">
             When on, any onion <code>ask</code> skips the Allow dialog
             (including Bash / WebSearch at L2). <code>deny</code> is never
-            auto-allowed.
-          </p>
-        </div>
-      </div>
-
-      <div className="toggle-setting">
-        <button
-          type="button"
-          onClick={() =>
-            void save({ ...settings, unsafeMode: !settings.unsafeMode })
-          }
-          disabled={saving}
-          className={`toggle mt-0.5${settings.unsafeMode ? ' toggle--on' : ' toggle--off'}`}
-          aria-label={
-            settings.unsafeMode ? 'Disable unsafe mode' : 'Enable unsafe mode'
-          }
-        >
-          <span
-            className={`toggle__knob${settings.unsafeMode ? ' toggle__knob--on' : ' toggle__knob--off'}`}
-          />
-        </button>
-        <div className="toggle-setting__info">
-          <p className="toggle-setting__label">Unsafe mode</p>
-          <p className="toggle-setting__desc">
-            Unused by onion authorize (auto-allow alone covers all{' '}
-            <code>ask</code>). Kept for UI / env compatibility —{' '}
+            auto-allowed. Env{' '}
             <code>HARNESS_AUTO_ALLOW=1</code> / <code>HARNESS_HEADLESS=1</code>{' '}
-            still turn both toggles on.
+            also enable this.
           </p>
         </div>
       </div>
