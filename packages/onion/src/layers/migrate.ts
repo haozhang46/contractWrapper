@@ -15,7 +15,8 @@ function isNewLevelsFormat(levels: unknown): boolean {
 
 function defaultGateConfig(): Record<string, unknown> {
   const gate = DEFAULT_ONION_LAYERS.find(l => l.type === 'capability-gate')
-  return gate ? { ...gate.config } : {}
+  // Deep-copy so migrated layers do not share tools/levels arrays with defaults.
+  return gate ? structuredClone(gate.config) : {}
 }
 
 function migrateCapabilityGate(layer: OnionLayerConfig): OnionLayerConfig {

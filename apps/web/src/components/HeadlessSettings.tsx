@@ -55,9 +55,9 @@ export default function HeadlessSettings(): ReactElement {
         <div className="toggle-setting__info">
           <p className="toggle-setting__label">Headless auto-allow</p>
           <p className="toggle-setting__desc">
-            When on, non-L3 onion <code>ask</code> skips the Allow dialog. L3
-            tools (Bash, WebSearch, …) still require confirmation unless Unsafe
-            mode is on.
+            When on, any onion <code>ask</code> skips the Allow dialog
+            (including Bash / WebSearch at L2). <code>deny</code> is never
+            auto-allowed.
           </p>
         </div>
       </div>
@@ -81,9 +81,10 @@ export default function HeadlessSettings(): ReactElement {
         <div className="toggle-setting__info">
           <p className="toggle-setting__label">Unsafe mode</p>
           <p className="toggle-setting__desc">
-            With auto-allow, also auto-pass L3 tools (no Allow dialog). Env{' '}
+            Unused by onion authorize (auto-allow alone covers all{' '}
+            <code>ask</code>). Kept for UI / env compatibility —{' '}
             <code>HARNESS_AUTO_ALLOW=1</code> / <code>HARNESS_HEADLESS=1</code>{' '}
-            enable both auto-allow and unsafe mode.
+            still turn both toggles on.
           </p>
         </div>
       </div>

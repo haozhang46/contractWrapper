@@ -3,13 +3,13 @@ import { join } from 'node:path'
 
 export type HeadlessSettings = {
   /**
-   * When true, onion `ask` for non-L3 tools is auto-allowed
-   * (no Confirm UI / wait_resolve). L3 still requires confirm unless unsafeMode.
+   * When true, any onion `ask` is auto-allowed (no Confirm UI / wait_resolve),
+   * including Bash / WebSearch at L2. Deny is never bypassed.
    */
   autoAllow: boolean
   /**
-   * Unsafe mode: together with autoAllow, L3 `ask` is also auto-allowed.
-   * Without this, L3 always needs explicit user confirmation.
+   * Persisted for UI / env compatibility. Not consulted by onion authorize;
+   * autoAllow alone covers all ask decisions.
    */
   unsafeMode: boolean
 }
@@ -21,7 +21,7 @@ function headlessPath(workspaceRoot: string): string {
 }
 
 export function loadHeadlessSettings(workspaceRoot: string): HeadlessSettings {
-  // Nuclear headless: preserve prior HARNESS_AUTO_ALLOW / HEADLESS = full pass (incl. L3)
+  // Nuclear headless: HARNESS_AUTO_ALLOW / HEADLESS enable both toggles (authorize uses autoAllow only)
   if (
     process.env.HARNESS_AUTO_ALLOW === '1' ||
     process.env.HARNESS_HEADLESS === '1'

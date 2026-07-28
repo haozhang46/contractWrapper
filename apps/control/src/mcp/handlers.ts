@@ -1,8 +1,4 @@
-import type {
-  AuthorizeRequest,
-  AuthorizeResult,
-  CapabilityLevel,
-} from '@harness/protocol'
+import type { AuthorizeRequest, AuthorizeResult } from '@harness/protocol'
 import type { EvaluateResult } from '@harness/onion'
 import { writeAudit } from '../audit/write.ts'
 import { loadHeadlessSettings } from '../bootstrap/loadHeadless.ts'
@@ -14,7 +10,6 @@ export async function handleAuthorize(
       tool: string,
       input: Record<string, unknown>,
     ) => Promise<EvaluateResult>
-    classify?: (toolName: string) => CapabilityLevel
   },
   pending: PendingStore,
   req: AuthorizeRequest,
