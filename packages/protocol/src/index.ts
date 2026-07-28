@@ -3,7 +3,6 @@ export type CapabilityLevel = 'L1' | 'L2' | 'L3'
 export type OnionLayerType =
   | 'audit'
   | 'capability-gate'
-  | 'require-confirm'
   | 'path-sandbox'
   | 'network-allowlist'
   | 'deny-pattern'
@@ -23,10 +22,12 @@ export interface ContractOnion {
   layers: OnionLayerConfig[]
 }
 
+export type LayerDecision = 'allow' | 'deny' | 'ask'
+
 export interface CapabilityGateConfig {
-  level: CapabilityLevel
-  allowedTools?: string[]
-  disallowedTools?: string[]
+  levels: Record<CapabilityLevel, LayerDecision>
+  tools: Record<CapabilityLevel, string[]>
+  defaultLevel: CapabilityLevel
 }
 
 export interface AuthorizeRequest {
