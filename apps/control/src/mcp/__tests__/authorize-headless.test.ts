@@ -19,9 +19,9 @@ function writeHeadless(
   )
 }
 
-describe('handleAuthorize headless autoAllow / unsafeMode', () => {
-  test('L3 ask still needs_confirm when autoAllow=true but unsafeMode=false', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'harness-headless-safe-'))
+describe('handleAuthorize headless autoAllow', () => {
+  test('L2 WebSearch ask auto-allows when autoAllow=true (no unsafeMode needed)', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'harness-headless-l2-'))
     writeHeadless(root, { autoAllow: true, unsafeMode: false })
     const pending = new PendingStore({ defaultTimeoutMs: 60_000 })
     const result = await handleAuthorize(
@@ -31,26 +31,7 @@ describe('handleAuthorize headless autoAllow / unsafeMode', () => {
           auditTrail: [],
           message: 'Confirm WebSearch',
         }),
-      },
-      pending,
-      { toolName: 'WebSearch', input: {}, sessionId: 's1' },
-      { workspaceRoot: root },
-    )
-    expect(result.decision).toBe('needs_confirm')
-    expect(pending.list().length).toBe(1)
-  })
-
-  test('L3 ask auto-allows when autoAllow + unsafeMode', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'harness-headless-unsafe-'))
-    writeHeadless(root, { autoAllow: true, unsafeMode: true })
-    const pending = new PendingStore({ defaultTimeoutMs: 60_000 })
-    const result = await handleAuthorize(
-      {
-        evaluate: async () => ({
-          decision: 'ask' as const,
-          auditTrail: [],
-          message: 'Confirm WebSearch',
-        }),
+        classify: () => 'L2' as const,
       },
       pending,
       { toolName: 'WebSearch', input: {}, sessionId: 's1' },
@@ -60,8 +41,29 @@ describe('handleAuthorize headless autoAllow / unsafeMode', () => {
     expect(pending.list().length).toBe(0)
   })
 
-  test('non-L3 ask auto-allows when autoAllow=true without unsafeMode', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'harness-headless-l1-'))
+  test('deny is never bypassed by autoAllow', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'harness-headless-deny-'))
+    writeHeadless(root, { autoAllow: true, unsafeMode: true })
+    const pending = new PendingStore({ defaultTimeoutMs: 60_000 })
+    const result = await handleAuthorize(
+      {
+        evaluate: async () => ({
+          decision: 'deny' as const,
+          auditTrail: [],
+          message: 'L3 denied',
+        }),
+        classify: () => 'L3' as const,
+      },
+      pending,
+      { toolName: 'Danger', input: {}, sessionId: 's1' },
+      { workspaceRoot: root },
+    )
+    expect(result).toEqual({ decision: 'deny', reason: 'L3 denied' })
+    expect(pending.list().length).toBe(0)
+  })
+
+  test('ask auto-allows when autoAllow=true', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'harness-headless-ask-'))
     writeHeadless(root, { autoAllow: true, unsafeMode: false })
     const pending = new PendingStore({ defaultTimeoutMs: 60_000 })
     const result = await handleAuthorize(
@@ -69,11 +71,12 @@ describe('handleAuthorize headless autoAllow / unsafeMode', () => {
         evaluate: async () => ({
           decision: 'ask' as const,
           auditTrail: [],
-          message: 'Confirm Read',
+          message: 'Confirm Bash',
         }),
+        classify: () => 'L2' as const,
       },
       pending,
-      { toolName: 'Read', input: {}, sessionId: 's1' },
+      { toolName: 'Bash', input: {}, sessionId: 's1' },
       { workspaceRoot: root },
     )
     expect(result).toEqual({ decision: 'allow' })
@@ -91,6 +94,7 @@ describe('handleAuthorize headless autoAllow / unsafeMode', () => {
           auditTrail: [],
           message: 'Confirm WebSearch',
         }),
+        classify: () => 'L2' as const,
       },
       pending,
       { toolName: 'WebSearch', input: {}, sessionId: 's1' },

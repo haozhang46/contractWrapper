@@ -28,8 +28,8 @@ describe('GET/PUT /api/onion', () => {
     const originalBody = await original.json()
 
     const updatedLayers = originalBody.layers.map((layer: OnionLayerConfig) =>
-      layer.id === 'default-require-confirm'
-        ? { ...layer, name: 'Updated Confirm Layer' }
+      layer.id === 'default-capability-gate'
+        ? { ...layer, name: 'Updated Capability Gate' }
         : layer,
     )
 
@@ -42,9 +42,9 @@ describe('GET/PUT /api/onion', () => {
 
     const getRes = await app.request('http://localhost/api/onion')
     const getBody = await getRes.json()
-    const confirmLayer = getBody.layers.find(
-      (layer: OnionLayerConfig) => layer.id === 'default-require-confirm',
+    const gateLayer = getBody.layers.find(
+      (layer: OnionLayerConfig) => layer.id === 'default-capability-gate',
     )
-    expect(confirmLayer?.name).toBe('Updated Confirm Layer')
+    expect(gateLayer?.name).toBe('Updated Capability Gate')
   })
 })

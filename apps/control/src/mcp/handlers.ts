@@ -1,5 +1,8 @@
-import type { AuthorizeRequest, AuthorizeResult } from '@harness/protocol'
-import { classifyToolCapability } from '@harness/onion'
+import type {
+  AuthorizeRequest,
+  AuthorizeResult,
+  CapabilityLevel,
+} from '@harness/protocol'
 import type { EvaluateResult } from '@harness/onion'
 import { writeAudit } from '../audit/write.ts'
 import { loadHeadlessSettings } from '../bootstrap/loadHeadless.ts'
@@ -11,6 +14,7 @@ export async function handleAuthorize(
       tool: string,
       input: Record<string, unknown>,
     ) => Promise<EvaluateResult>
+    classify?: (toolName: string) => CapabilityLevel
   },
   pending: PendingStore,
   req: AuthorizeRequest,
@@ -21,12 +25,7 @@ export async function handleAuthorize(
 
   if (result.decision === 'ask') {
     const settings = loadHeadlessSettings(opts.workspaceRoot)
-    const isL3 = classifyToolCapability(req.toolName) === 'L3'
-    // Safe autoAllow: skip confirm for non-L3 only.
-    // Unsafe mode + autoAllow: full pass including L3.
-    const autoPass =
-      settings.autoAllow && (!isL3 || settings.unsafeMode)
-    if (autoPass) {
+    if (settings.autoAllow) {
       return { decision: 'allow' }
     }
     const message = result.message ?? `Confirm tool ${req.toolName}`
