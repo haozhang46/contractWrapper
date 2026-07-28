@@ -1,8 +1,18 @@
-import type { ContractOnion, OnionLayerConfig } from '@harness/protocol'
-import { createCapabilityGateMiddleware } from './layers/capabilityGate.ts'
+import type {
+  CapabilityGateConfig,
+  CapabilityLevel,
+  ContractOnion,
+  OnionLayerConfig,
+} from '@harness/protocol'
+import { createAuditMiddleware } from './layers/audit.ts'
+import {
+  classifyToolCapability,
+  createCapabilityGateMiddleware,
+  parseCapabilityGateConfig,
+} from './layers/capabilityGate.ts'
+import { migrateOnionLayers } from './layers/migrate.ts'
 import { DEFAULT_ONION_LAYERS } from './defaultLayers.ts'
 import type {
-  AuditEntry,
   EvaluateResult,
   OnionEvaluateContext,
   OnionMiddleware,
@@ -34,6 +44,7 @@ function compose(middlewares: OnionMiddleware[]): OnionMiddleware {
 export class OnionRuntime {
   private layers: OnionLayerConfig[] = []
   private middlewares: OnionMiddleware[] = []
+  private gateConfig: CapabilityGateConfig | null = null
   private initialized = false
 
   load(contract: ContractOnion | null): void {
@@ -65,6 +76,7 @@ export class OnionRuntime {
     const composed = compose(this.middlewares)
 
     await composed(ctx, async () => {
+      // Terminal default: allow continues through pipe; unset → allow.
       ctx.decision = ctx.decision ?? 'allow'
     })
 
@@ -75,6 +87,18 @@ export class OnionRuntime {
       auditTrail: ctx.auditTrail,
       message: ctx.message,
     }
+  }
+
+  classify(toolName: string): CapabilityLevel {
+    if (!this.initialized) {
+      this.load(null)
+    }
+    const config =
+      this.gateConfig ??
+      parseCapabilityGateConfig(
+        DEFAULT_ONION_LAYERS.find(l => l.type === 'capability-gate')!.config,
+      )
+    return classifyToolCapability(toolName, config)
   }
 
   getLayers(): OnionLayerConfig[] {
@@ -93,15 +117,25 @@ export class OnionRuntime {
   }
 
   private applyLayers(raw: OnionLayerConfig[]): void {
-    const hasAudit = raw.some(l => l.type === 'audit' && l.enabled)
+    const migrated = migrateOnionLayers(raw)
+    const hasAudit = migrated.some(l => l.type === 'audit' && l.enabled)
     this.layers = hasAudit
-      ? [...raw].sort((a, b) => a.priority - b.priority)
-      : [...DEFAULT_ONION_LAYERS.filter(l => l.type === 'audit'), ...raw].sort(
-          (a, b) => a.priority - b.priority,
-        )
+      ? [...migrated].sort((a, b) => a.priority - b.priority)
+      : [
+          ...DEFAULT_ONION_LAYERS.filter(l => l.type === 'audit'),
+          ...migrated,
+        ].sort((a, b) => a.priority - b.priority)
 
+    this.cacheGateConfig()
     this.rebuildMiddlewares()
     this.initialized = true
+  }
+
+  private cacheGateConfig(): void {
+    const gate = this.layers.find(l => l.type === 'capability-gate' && l.enabled)
+    this.gateConfig = gate
+      ? parseCapabilityGateConfig(gate.config)
+      : null
   }
 
   private rebuildMiddlewares(): void {
@@ -117,29 +151,13 @@ export class OnionRuntime {
   private layerToMiddleware(layer: OnionLayerConfig): OnionMiddleware {
     switch (layer.type) {
       case 'audit':
-        return this.createAuditMiddleware(layer)
+        return createAuditMiddleware(layer)
       case 'capability-gate':
         return createCapabilityGateMiddleware(layer)
       default:
         return async (_ctx, next) => {
           await next()
         }
-    }
-  }
-
-  private createAuditMiddleware(layer: OnionLayerConfig): OnionMiddleware {
-    return async (ctx, next) => {
-      const entry: AuditEntry = {
-        timestamp: new Date().toISOString(),
-        layerId: layer.id,
-        layerType: 'audit',
-        toolName: ctx.toolName,
-        decision: 'allow',
-      }
-      await next()
-      entry.decision = ctx.decision ?? 'deny'
-      entry.reason = ctx.message
-      ctx.auditTrail.push(entry)
     }
   }
 
@@ -157,5 +175,4 @@ export class OnionRuntime {
       message: `Permission denied: no active contract layers for ${toolName}.`,
     }
   }
-
 }
