@@ -1,5 +1,5 @@
 import type { ContractOnion, OnionLayerConfig } from '@harness/protocol'
-import { classifyToolCapability } from './classifyToolCapability.ts'
+import { createCapabilityGateMiddleware } from './layers/capabilityGate.ts'
 import { DEFAULT_ONION_LAYERS } from './defaultLayers.ts'
 import type {
   AuditEntry,
@@ -119,9 +119,7 @@ export class OnionRuntime {
       case 'audit':
         return this.createAuditMiddleware(layer)
       case 'capability-gate':
-        return this.createCapabilityGateMiddleware(layer)
-      case 'require-confirm':
-        return this.createRequireConfirmMiddleware(layer)
+        return createCapabilityGateMiddleware(layer)
       default:
         return async (_ctx, next) => {
           await next()
@@ -142,43 +140,6 @@ export class OnionRuntime {
       entry.decision = ctx.decision ?? 'deny'
       entry.reason = ctx.message
       ctx.auditTrail.push(entry)
-    }
-  }
-
-  private createCapabilityGateMiddleware(
-    _layer: OnionLayerConfig,
-  ): OnionMiddleware {
-    return async (ctx, next) => {
-      const toolCapabilityLevel = classifyToolCapability(ctx.toolName)
-
-      if (toolCapabilityLevel === 'L1') {
-        await next()
-        return
-      }
-
-      if (toolCapabilityLevel === 'L3') {
-        ctx.decision = 'ask'
-        ctx.message = `The operation "${ctx.toolName}" requires your explicit confirmation before execution.`
-        return
-      }
-
-      await next()
-    }
-  }
-
-  private createRequireConfirmMiddleware(
-    layer: OnionLayerConfig,
-  ): OnionMiddleware {
-    return async (ctx, next) => {
-      const tools = layer.config.tools as string[] | undefined
-      if (tools !== undefined && tools.includes(ctx.toolName)) {
-        ctx.decision = 'ask'
-        ctx.message =
-          (layer.config.confirmMessage as string | undefined) ??
-          `Confirm ${ctx.toolName}?`
-        return
-      }
-      await next()
     }
   }
 
