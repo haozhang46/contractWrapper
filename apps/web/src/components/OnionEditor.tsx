@@ -1,11 +1,13 @@
 import { useEffect, useState, type ReactElement } from 'react'
-import type { OnionLayerConfig } from '../types/onion'
+import type { CapabilityGateConfig, OnionLayerConfig } from '../types/onion'
 import { toOnionLayerList } from '../mappers/onion'
+import OnionLayerForm from './OnionLayerForm'
 
 export default function OnionEditor(): ReactElement {
   const [layers, setLayers] = useState<OnionLayerConfig[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   useEffect(function loadOnionLayers() {
     fetch('/api/onion')
@@ -26,7 +28,7 @@ export default function OnionEditor(): ReactElement {
         body: JSON.stringify({ layers: newLayers }),
       })
       const data = await res.json()
-      setLayers(data.layers ?? newLayers)
+      setLayers(toOnionLayerList(data.layers ?? newLayers))
     } finally {
       setSaving(false)
     }
@@ -57,6 +59,18 @@ export default function OnionEditor(): ReactElement {
     if (layer?.type === 'audit') return
     const updated = layers.filter(l => l.id !== id)
     setLayers(updated)
+    if (expandedId === id) setExpandedId(null)
+    await save(updated)
+  }
+
+  const saveGateConfig = async (
+    id: string,
+    config: CapabilityGateConfig,
+  ) => {
+    const updated = layers.map(l =>
+      l.id === id ? { ...l, config: { ...config } } : l,
+    )
+    setLayers(updated)
     await save(updated)
   }
 
@@ -72,56 +86,79 @@ export default function OnionEditor(): ReactElement {
         </p>
       )}
       {layers.map((layer, idx) => (
-        <div
-          key={layer.id}
-          className={`onion-editor__layer${layer.enabled ? ' onion-editor__layer--enabled' : ' onion-editor__layer--disabled'}`}
-        >
-          <button
-            type="button"
-            onClick={() => void toggleLayer(layer.id)}
-            className={`toggle${layer.enabled ? ' toggle--on' : ' toggle--off'}`}
-            aria-label={layer.enabled ? 'Disable layer' : 'Enable layer'}
+        <div key={layer.id} className="onion-editor__block">
+          <div
+            className={`onion-editor__layer${layer.enabled ? ' onion-editor__layer--enabled' : ' onion-editor__layer--disabled'}`}
           >
-            <span
-              className={`toggle__knob${layer.enabled ? ' toggle__knob--on' : ' toggle__knob--off'}`}
-            />
-          </button>
+            <button
+              type="button"
+              onClick={() => void toggleLayer(layer.id)}
+              className={`toggle${layer.enabled ? ' toggle--on' : ' toggle--off'}`}
+              aria-label={layer.enabled ? 'Disable layer' : 'Enable layer'}
+            >
+              <span
+                className={`toggle__knob${layer.enabled ? ' toggle__knob--on' : ' toggle__knob--off'}`}
+              />
+            </button>
 
-          <div className="onion-editor__layer-info">
-            <p className="onion-editor__layer-name">{layer.name}</p>
-            <p className="onion-editor__layer-meta">
-              {layer.type} · priority {layer.priority}
-            </p>
+            <div className="onion-editor__layer-info">
+              <p className="onion-editor__layer-name">{layer.name}</p>
+              <p className="onion-editor__layer-meta">
+                {layer.type} · priority {layer.priority}
+              </p>
+            </div>
+
+            {layer.type === 'capability-gate' && (
+              <button
+                type="button"
+                className="onion-editor__edit-btn"
+                onClick={() =>
+                  setExpandedId(expandedId === layer.id ? null : layer.id)
+                }
+                aria-expanded={expandedId === layer.id}
+              >
+                {expandedId === layer.id ? 'Close' : 'Edit'}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => void moveLayer(layer.id, 'up')}
+              disabled={idx === 0}
+              className="onion-editor__move-btn"
+              aria-label="Move up"
+            >
+              ▲
+            </button>
+            <button
+              type="button"
+              onClick={() => void moveLayer(layer.id, 'down')}
+              disabled={idx === layers.length - 1}
+              className="onion-editor__move-btn"
+              aria-label="Move down"
+            >
+              ▼
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void deleteLayer(layer.id)}
+              disabled={layer.type === 'audit'}
+              className="onion-editor__delete-btn"
+              aria-label="Delete layer"
+            >
+              ✕
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => void moveLayer(layer.id, 'up')}
-            disabled={idx === 0}
-            className="onion-editor__move-btn"
-            aria-label="Move up"
-          >
-            ▲
-          </button>
-          <button
-            type="button"
-            onClick={() => void moveLayer(layer.id, 'down')}
-            disabled={idx === layers.length - 1}
-            className="onion-editor__move-btn"
-            aria-label="Move down"
-          >
-            ▼
-          </button>
-
-          <button
-            type="button"
-            onClick={() => void deleteLayer(layer.id)}
-            disabled={layer.type === 'audit'}
-            className="onion-editor__delete-btn"
-            aria-label="Delete layer"
-          >
-            ✕
-          </button>
+          {layer.type === 'capability-gate' && expandedId === layer.id && (
+            <OnionLayerForm
+              config={layer.config}
+              saving={saving}
+              onCancel={() => setExpandedId(null)}
+              onSave={config => void saveGateConfig(layer.id, config)}
+            />
+          )}
         </div>
       ))}
 

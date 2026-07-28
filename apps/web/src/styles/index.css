@@ -504,6 +504,66 @@
   @apply text-xs text-zinc-500;
 }
 
+.onion-editor__block {
+  @apply space-y-0;
+}
+
+.onion-editor__edit-btn {
+  @apply text-xs px-2 py-1 rounded border border-zinc-600 text-zinc-300 hover:text-zinc-100 hover:border-zinc-500;
+
+  &:disabled {
+    @apply opacity-40;
+  }
+}
+
+.onion-editor__gate {
+  @apply mt-1 mb-2 p-3 rounded-lg border border-zinc-700 bg-zinc-900/60 space-y-4;
+}
+
+.onion-editor__gate-section {
+  @apply space-y-2;
+}
+
+.onion-editor__gate-heading {
+  @apply text-xs font-medium text-zinc-400;
+}
+
+.onion-editor__gate-levels {
+  @apply grid grid-cols-3 gap-2;
+}
+
+.onion-editor__gate-field {
+  @apply block min-w-0;
+}
+
+.onion-editor__gate-tools {
+  @apply max-h-64 overflow-y-auto space-y-1;
+}
+
+.onion-editor__gate-empty {
+  @apply text-xs text-zinc-500;
+}
+
+.onion-editor__gate-row {
+  @apply flex items-center gap-2;
+}
+
+.onion-editor__gate-tool-name {
+  @apply flex-1 min-w-0 text-sm text-zinc-200 truncate font-mono;
+}
+
+.onion-editor__gate-row-select {
+  @apply w-20 shrink-0 py-1;
+}
+
+.onion-editor__gate-add {
+  @apply flex items-center gap-2 pt-1;
+}
+
+.onion-editor__gate-actions {
+  @apply flex items-center justify-end gap-2 pt-1;
+}
+
 /* ============================================================
    Memory Settings
    ============================================================ */
