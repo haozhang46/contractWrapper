@@ -135,20 +135,64 @@ eee 上已有 harness 等私有 commit 时：
 
 若需要「补丁文件」形态（可审查、可存档、可跨仓传），用 git：
 
-### `format-patch` + `git am`（推荐的 patch 路径）
+### `format-patch` + `git am` SOP
 
-等价于把一段 commit 导出成 `.patch` 再打进 eee；**冲突时 `am` 会停住**（类似 cherry-pick）。
+`git am` = **Apply Mailbox**：把 `format-patch` 生成的一串 `.patch` **按顺序打成 commit**（保留原作者/说明）。本质接近 cherry-pick，只是中间多了补丁文件。
+
+**何时用：** 要存档、给别人审、跨仓传补丁；日常本机同步仍优先 **cherry-pick**。
+
+#### 步骤
 
 ```bash
 cd ccb
 git fetch ccb
-git format-patch -o /tmp/ccb-patches <start>..<end> -- optional/path/
+
+# 1) 选定 CCB 上的 commit 区间（不含 start，含 end；或单个 -1 <sha>）
+git log --oneline <start>..<end>          # 先看会导出哪些
+
+# 2) 导出补丁（可加 -- path/ 只导出相关路径的 commit 触碰内容仍按 commit 边界）
+rm -rf /tmp/ccb-patches && mkdir -p /tmp/ccb-patches
+git format-patch -o /tmp/ccb-patches <start>..<end>
+# 单 commit：git format-patch -o /tmp/ccb-patches -1 <sha>
+ls /tmp/ccb-patches                       # 0001-....patch, 0002-....patch …
+
+# 3) （可选）人工审 patch 内容后再打
+# less /tmp/ccb-patches/0001-*.patch
+
+# 4) 在 eee 当前分支上按序应用（会生成对应 commit）
 git am /tmp/ccb-patches/*.patch
-# 冲突：编辑 → git add → git am --continue
-# 放弃：git am --abort
 ```
 
-与 cherry-pick 比：多一层补丁文件 intermediate；日常仍优先 cherry-pick，除非要存档/传给别人。
+#### 冲突时
+
+```bash
+# am 停住后：
+git status                                # 看未合并路径
+# 编辑文件，去掉 <<<<<<<
+git add <resolved-files>
+git am --continue                         # 继续下一封 patch
+
+# 跳过当前这一封（慎用）：
+# git am --skip
+
+# 整段放弃，回到 am 之前：
+# git am --abort
+```
+
+#### 打完后
+
+```bash
+git log --oneline -5                      # 确认新 commit 已在 eee
+git push origin HEAD
+cd .. && git add ccb && git commit -m "chore(ccb): bump submodule after CCB am sync"
+```
+
+#### 注意
+
+- 区间写错会导出过多/过少 commit；先 `git log` 确认。
+- `format-patch A..B` 的 **A 不含、B 含**（和 cherry-pick 区间习惯一致）。
+- 依赖链：后面的 patch 可能依赖前面的；中途 `--skip` 容易把后续搞崩。
+- 与 cherry-pick 选同一批 sha 时，结果应等价；只是多了 `/tmp` 里可审的补丁文件。
 
 ### `git diff` + `git apply`（临时手搓）
 

@@ -56,10 +56,13 @@ git checkout ccb/main -- <paths>
 # B) cherry-pick
 git cherry-pick <sha>...
 
-# C) git patch 包
-git format-patch -o /tmp/ccb-patches <start>..<end> -- path/
+# C) git am（补丁包 SOP；日常优先 cherry-pick）
+rm -rf /tmp/ccb-patches && mkdir -p /tmp/ccb-patches
+git log --oneline <start>..<end>
+git format-patch -o /tmp/ccb-patches <start>..<end>   # 或 -1 <sha>
 git am /tmp/ccb-patches/*.patch
-# 冲突：git add → git am --continue ；放弃：git am --abort
+# 冲突：编辑 → git add → git am --continue
+# 放弃：git am --abort ；跳过当前：git am --skip（慎）
 
 # D) 单 diff（临时）
 git diff HEAD ccb/main -- path > /tmp/x.patch

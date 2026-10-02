@@ -55,10 +55,15 @@ git checkout ccb/main -- <path1> <path2>
 # B) cherry-pick（要冲突）
 git cherry-pick <sha> [<sha>...]
 
-# C) git patch 包（可审查、可传仓；冲突时 am 会停）
-git format-patch -o /tmp/ccb-patches <start>..<end> -- path/
+# C) git am SOP（补丁包；要存档/传审时用；日常仍优先 cherry-pick）
+rm -rf /tmp/ccb-patches && mkdir -p /tmp/ccb-patches
+git log --oneline <start>..<end>                    # 确认区间
+git format-patch -o /tmp/ccb-patches <start>..<end> # 或 -1 <sha>
+# 可选：审 /tmp/ccb-patches/*.patch
 git am /tmp/ccb-patches/*.patch
-# 冲突：解完 → git add → git am --continue ；放弃 → git am --abort
+# 冲突：编辑 → git add → git am --continue
+# 跳过当前封：git am --skip （慎用）
+# 整段放弃：git am --abort
 
 # D) 单次 diff 补丁（临时；不如 cherry-pick）
 git diff HEAD ccb/main -- path/foo.ts > /tmp/foo.patch
