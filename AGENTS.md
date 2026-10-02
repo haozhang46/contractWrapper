@@ -79,6 +79,17 @@ cd .. && git add ccb && git commit -m "chore(ccb): bump submodule after CCB sync
 
 path checkout **不会**产生 `<<<<<<<`。`pnpm patch` 不在本 SOP 内。
 
+### path checkout（cover）风险 — 用前必须提示用户
+
+`git checkout <ref> -- <paths>` / `git restore --source=...` 是 **直接覆盖**，不是合并：
+
+- **无冲突提示**，不会出现 `<<<<<<<`；本地同路径内容直接变成 CCB 版本。
+- **未提交改动可能被盖掉**且难以找回；已提交的 eee 独有修改也会从工作树消失（历史里还在，但当前文件已是上游版）。
+- **私有钩子高危路径**（如 `src/harness/`）禁止在未确认、未备份/未 commit 时 cover。
+- Agent **不得擅自**对未点名的路径做 path checkout；执行前须列出路径并请用户确认「接受直接盖住、无 conflict 提示」。
+
+若用户需要看冲突再合 → 改用 **cherry-pick** / **git am**，不要用 path checkout。
+
 ### 私有改动
 
 产品逻辑在 `apps/` / `packages/`；勿盲目 cover `src/harness/` 等 eee 钩子。详情与路径约定见 `docs/ccb-submodule.md`。

@@ -30,12 +30,20 @@ alwaysApply: true
 
 | 场景 | 用哪 | 冲突 |
 |------|------|------|
-| 若干路径跟某 CCB ref 对齐 | `git checkout <ref> -- <paths>` | 无，cover |
+| 若干路径跟某 CCB ref 对齐 | `git checkout <ref> -- <paths>` | 无，cover（**高风险，须用户确认**） |
 | 若干上游 commit | `git cherry-pick <sha>…` | 有 |
 | 可存档/可传补丁包 | `format-patch` → `git am` | 有（am 停住） |
 | 一次性手搓 diff | `git diff` → `git apply --3way` | 需 `--3way` 才像 merge |
 | 偶发整线 | `git merge ccb/main` | 有；少用 |
 | 全量 rebase / `pnpm patch` | **禁止** | — |
+
+## path checkout 风险（cover）
+
+执行前 **必须提示用户并得到确认**：
+
+- 直接覆盖，**无 `<<<<<<<`**；未提交改动可能丢失。
+- 勿 cover 未点名路径；**禁止**在未确认时 cover `src/harness/` 等私有钩子。
+- 需要冲突提示 → 改用 cherry-pick / `git am`。
 
 ## 命令骨架
 
