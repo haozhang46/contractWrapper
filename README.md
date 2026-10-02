@@ -46,7 +46,8 @@ git submodule [`skill-factory/`](./skill-factory/) → [haozhang46/skill-factory
 
 ## 文档
 
-- [CCB Submodule（upstream 同步）](./docs/ccb-submodule.md)
+- [CCB Submodule（CCB→eee 同步）](./docs/ccb-submodule.md)
+- [AGENTS.md（Cursor 同步 SOP）](./AGENTS.md)
 - [北极星架构](./docs/superpowers/specs/2026-07-17-harness-control-console-north-star-design.md)
 - [Spec 线](./docs/superpowers/specs/2026-07-17-harness-control-console-spec-line.md)
 - [会话交接（下一个 Chat 从这里继续）](./docs/superpowers/handoffs/2026-07-17-continue-from-ccb-understand.md)

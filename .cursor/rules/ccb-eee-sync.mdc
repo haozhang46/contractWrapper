@@ -1,0 +1,62 @@
+---
+description: CCB→eee submodule sync SOP (path checkout / cherry-pick; no full rebase)
+alwaysApply: true
+---
+
+# CCB → eee 同步 SOP
+
+详细说明见 `docs/ccb-submodule.md`。Agent 同步上游时按本规则执行。
+
+## 命名
+
+| 名称 | 含义 |
+|------|------|
+| `ccb/` | 父仓 submodule 路径 |
+| **eee** | fork（`origin` = `haozhang46/eee`） |
+| **CCB** | eee 上游（remote 名 **`ccb`** = `claude-code-best/claude-code`） |
+
+禁止用 `pnpm patch` 维护对 CCB 的改动。
+
+## 原则
+
+- **停在 eee 分支上操作**（不要先 checkout 到 CCB 再全量 rebase）。
+- **不要**对 `ccb/main` 做整仓 rebase（eee 私有 commit 多，冲突面大）。
+- 多 version / 挑修复：**cherry-pick** 指定 sha；要对齐某 ref 上的文件现状：**path checkout**。
+- 同步后：`push origin`（eee）→ 父仓 bump `ccb` 指针并 commit。
+
+## 一句话选型
+
+**path checkout = 指定路径后直接用 CCB 版本盖住；要冲突提示、只吃部分 diff，用 cherry-pick。**
+
+| 场景 | 用哪 | 冲突 |
+|------|------|------|
+| 若干文件/目录跟某 CCB ref 现状对齐 | `git checkout <ref> -- <paths>` | 无，直接 cover |
+| 只要某几个上游 commit | `git cherry-pick <sha>…` | 有，pause 解完 `--continue` |
+| 偶发整线对齐 | `git merge ccb/main` | 有；少用 |
+| 整仓 rebase 到 CCB | **禁止作为日常 SOP** | — |
+
+`<ref>` 可以是 `ccb/main`、tag（如 `v2.8.4`）或具体 sha。
+
+## 命令骨架
+
+```bash
+cd ccb
+git fetch ccb
+# 可选：git log --oneline HEAD..ccb/main
+# 可选：git diff --name-only HEAD ccb/main
+
+# A) path checkout（盖住）
+git checkout ccb/main -- <path1> <path2>
+# 或：git checkout <tag-or-sha> -- <paths>
+
+# B) cherry-pick（要冲突提示）
+git cherry-pick <sha> [<sha>...]
+
+git push origin HEAD
+cd .. && git add ccb && git commit -m "chore(ccb): bump submodule after CCB sync"
+```
+
+## 私有改动
+
+- 产品逻辑放 `apps/` / `packages/`；`ccb/` 只留薄钩子。
+- 勿盲目 cover `src/harness/` 等 eee 私有路径。

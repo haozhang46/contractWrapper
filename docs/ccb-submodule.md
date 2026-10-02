@@ -41,16 +41,25 @@ git remote -v
 
 ## 从 CCB 同步到 eee（默认：path checkout）
 
-eee ← **CCB（remote `ccb`）** 默认按路径同步：只搬指定文件/目录的当前内容，避免整仓大版本 merge。
+eee ← **CCB（remote `ccb`）** 默认按路径同步。
+
+**一句话：**  
+**path checkout = 指定路径后直接用 CCB 版本盖住；要冲突提示、只吃部分 diff，用 cherry-pick。**
+
+它**不是**「自动扫某个 commit 改了哪些文件再合并」。流程是：
+
+1. （可选）自己看差异 / 某 commit 动了哪些路径  
+2. 选定路径后 `checkout` / `restore` → **整份覆盖**，无三方合并
 
 ```bash
 cd ccb
 git fetch ccb
 
-# 查看与 CCB 差异（可选）
-git diff --stat HEAD ccb/main -- <paths...>
+# 可选：看相对 CCB 差哪些文件，或某 commit 改了啥
+git diff --name-only HEAD ccb/main
+git show --name-only <sha>
 
-# 按路径取 CCB 当前内容（覆盖工作区对应路径）
+# 按路径取 CCB 当前内容（覆盖工作区 + index 对应路径）
 git checkout ccb/main -- <path1> <path2> ...
 # 或：
 # git restore --source=ccb/main -- <path1> <path2> ...
@@ -59,6 +68,19 @@ git status
 git commit -m "sync(ccb): <简述路径与原因>"
 git push origin HEAD
 ```
+
+### path checkout 会不会报 conflict？
+
+**不会。** 没有 `<<<<<<<`，不做 merge：
+
+- 指定路径 = CCB 上那一版内容（直接 cover）
+- 本地未提交改动也可能被盖掉；**不要指望弹出冲突让你选**
+
+| | path checkout | cherry-pick |
+|--|--|--|
+| 单位 | 文件/目录的**整份当前内容** | **某个 commit** 的 patch |
+| 冲突 | 无，直接覆盖 | 有，停下来让你解 |
+| 适合 | 「这几个文件就跟 CCB 现状对齐」 | 「只要那几次修复的改动」 |
 
 ### 路径约定
 
@@ -90,11 +112,47 @@ git push origin HEAD
 
 commit message 建议带 `ccb: <sha>`，方便对照。
 
+## 多 version：停在 eee 上挑，不要全量 rebase
+
+eee 上已有 harness 等私有 commit 时：
+
+- **始终在 eee 分支操作**；不必先 `checkout` 到某个 CCB version 再干活。
+- **禁止日常** `git rebase` 整线到 `ccb/main`（冲突面大、改写历史）。
+- 多 version 里只要若干修复 → **`git cherry-pick <sha>…`**（可看 conflict）。
+- 某个 tag/sha 上的文件现状要对齐 → **`git checkout <tag-or-sha> -- <paths>`**（直接盖住）。
+- 偶发整线对齐才用 **`git merge ccb/main`**。
+
+## 还有哪些方式能看到 conflict？
+
+除 cherry-pick 外，凡是走 **三方合并** 的都会停在冲突上：
+
+| 方式 | 何时用 | 冲突行为 |
+|------|--------|----------|
+| **`cherry-pick`** | 只要若干 commit 的 patch | 有冲突则 pause，解完再 `--continue` |
+| **`merge ccb/main`** | 整线合入 CCB | 冲突文件带 `<<<<<<<`；范围大 |
+| **`rebase` 到 `ccb/main`** | 把 eee 独有 commit 接到 CCB 尖上 | 逐 commit 可能冲突；改写历史，协作需谨慎 |
+| **单文件 `git merge-file`** | 只要某几个文件、又想要冲突标记 | 手动取出 ours/base/theirs 再 merge-file（少用，偏手工） |
+
+实用建议：
+
+- **默认同步路径、接受盖住** → path checkout  
+- **要冲突提示 / 只吃部分 diff** → cherry-pick  
+- **偶尔整线对齐** → `merge`（或少数情况 rebase）  
+- 想「只合某目录又要冲突」：没有一等公民的 path-merge；常见做法是 `merge` 后把不想要的路径 `git checkout HEAD -- unwanted/` 还原，或对目标文件用 `merge-file`
+
+```bash
+# 整线 merge 示例（冲突会停住）
+cd ccb
+git fetch ccb
+git merge ccb/main
+# 解冲突 → git add → git commit
+```
+
 | 场景 | 用哪 |
 |------|------|
-| 要对齐某几个**文件/目录**的 CCB 现状 | **path checkout**（默认） |
-| 要跟上某几个**commit** | **cherry-pick** |
-| 整线跟上 `ccb/main` | `merge` / `rebase`（少用；冲突面大） |
+| 要对齐某几个**文件/目录**的 CCB 现状，可直接盖 | **path checkout**（默认） |
+| 要跟上某几个**commit**，需要冲突提示 | **cherry-pick** |
+| 整线跟上 `ccb/main`，接受大范围冲突 | **merge** /（少用）**rebase** |
 
 ## 私有改动原则
 
