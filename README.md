@@ -1,7 +1,7 @@
 # Harness 中控台
 
 北极星与 Spec 在 `docs/superpowers/`。  
-**实现基座：** git submodule [`ccb/`](./ccb/) → fork [haozhang46/eee](https://github.com/haozhang46/eee)（上游 [claude-code-best/claude-code](https://github.com/claude-code-best/claude-code)；无头 Agent，不用其终端 UI）。同步见 [CCB Submodule](./docs/ccb-submodule.md)。
+**实现基座：** git submodule [`ccb/`](./ccb/) → fork [eee](https://github.com/haozhang46/eee)；eee 上游为 **CCB** [claude-code-best/claude-code](https://github.com/claude-code-best/claude-code)（无头 Agent，不用其终端 UI）。同步见 [CCB Submodule](./docs/ccb-submodule.md)。
 
 ## 克隆本仓
 
