@@ -122,6 +122,38 @@ eee 上已有 harness 等私有 commit 时：
 - 某个 tag/sha 上的文件现状要对齐 → **`git checkout <tag-or-sha> -- <paths>`**（直接盖住）。
 - 偶发整线对齐才用 **`git merge ccb/main`**。
 
+## 备选：git patch（不是 pnpm patch）
+
+**禁止 `pnpm patch`。** 那是给 registry 依赖打补丁的；和 submodule fork 无关，上游一变极易整块失效。
+
+若需要「补丁文件」形态（可审查、可存档、可跨仓传），用 git：
+
+### `format-patch` + `git am`（推荐的 patch 路径）
+
+等价于把一段 commit 导出成 `.patch` 再打进 eee；**冲突时 `am` 会停住**（类似 cherry-pick）。
+
+```bash
+cd ccb
+git fetch ccb
+git format-patch -o /tmp/ccb-patches <start>..<end> -- optional/path/
+git am /tmp/ccb-patches/*.patch
+# 冲突：编辑 → git add → git am --continue
+# 放弃：git am --abort
+```
+
+与 cherry-pick 比：多一层补丁文件 intermediate；日常仍优先 cherry-pick，除非要存档/传给别人。
+
+### `git diff` + `git apply`（临时手搓）
+
+```bash
+git diff HEAD ccb/main -- path/foo.ts > /tmp/foo.patch
+# 可先改 patch 再打
+git apply --3way /tmp/foo.patch   # 尽量开三方，才可能出现 <<<<<<<
+# 普通 git apply：失败或留下 .rej，通常没有标准 conflict 标记
+```
+
+适合极小、一次性改动；长期维护成本高。
+
 ## 还有哪些方式能看到 conflict？
 
 除 cherry-pick 外，凡是走 **三方合并** 的都会停在冲突上：
@@ -129,15 +161,18 @@ eee 上已有 harness 等私有 commit 时：
 | 方式 | 何时用 | 冲突行为 |
 |------|--------|----------|
 | **`cherry-pick`** | 只要若干 commit 的 patch | 有冲突则 pause，解完再 `--continue` |
+| **`git am`** | format-patch 打补丁包 | 同 cherry-pick，pause 后 `--continue` / `--abort` |
+| **`git apply --3way`** | 单文件/手搓 patch | 才可能有 `<<<<<<<`；普通 `apply` 多半失败/`.rej` |
 | **`merge ccb/main`** | 整线合入 CCB | 冲突文件带 `<<<<<<<`；范围大 |
-| **`rebase` 到 `ccb/main`** | 把 eee 独有 commit 接到 CCB 尖上 | 逐 commit 可能冲突；改写历史，协作需谨慎 |
-| **单文件 `git merge-file`** | 只要某几个文件、又想要冲突标记 | 手动取出 ours/base/theirs 再 merge-file（少用，偏手工） |
+| **`rebase` 到 `ccb/main`** | 把 eee 独有 commit 接到 CCB 尖上 | 逐 commit 可能冲突；改写历史，非日常 |
+| **单文件 `git merge-file`** | 只要某几个文件、又想要冲突标记 | 手动取出 ours/base/theirs（少用） |
 
 实用建议：
 
 - **默认同步路径、接受盖住** → path checkout  
-- **要冲突提示 / 只吃部分 diff** → cherry-pick  
-- **偶尔整线对齐** → `merge`（或少数情况 rebase）  
+- **要冲突提示 / 只吃部分 diff** → cherry-pick（或 `format-patch` + `am`）  
+- **偶尔整线对齐** → `merge`（不要日常 rebase）  
+- **不要**用 `pnpm patch`  
 - 想「只合某目录又要冲突」：没有一等公民的 path-merge；常见做法是 `merge` 后把不想要的路径 `git checkout HEAD -- unwanted/` 还原，或对目标文件用 `merge-file`
 
 ```bash
@@ -152,6 +187,7 @@ git merge ccb/main
 |------|------|
 | 要对齐某几个**文件/目录**的 CCB 现状，可直接盖 | **path checkout**（默认） |
 | 要跟上某几个**commit**，需要冲突提示 | **cherry-pick** |
+| 要可存档/可传的补丁包 | **format-patch + am** |
 | 整线跟上 `ccb/main`，接受大范围冲突 | **merge** /（少用）**rebase** |
 
 ## 私有改动原则
