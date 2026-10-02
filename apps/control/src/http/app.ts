@@ -10,6 +10,7 @@ import { createCharterRoutes } from './routes/charter.ts'
 import { createConfirmRoutes } from './routes/confirm.ts'
 import { createHeadlessPagesRoutes } from './routes/headless-pages.ts'
 import { createHeadlessRoutes } from './routes/headless.ts'
+import { createLlmRoutes } from './routes/llm.ts'
 import { createMemoryRoutes } from './routes/memory.ts'
 import { createOnionRoutes } from './routes/onion.ts'
 import { createPendingRoutes } from './routes/pending.ts'
@@ -33,6 +34,7 @@ export function createApp({
   app.route('/api/chat', createChatRoutes(workspaceRoot))
   app.route('/api/chat-sessions', createChatSessionsRoutes(workspaceRoot))
   app.route('/api/memory', createMemoryRoutes(workspaceRoot))
+  app.route('/api/llm', createLlmRoutes(workspaceRoot))
   app.route('/api/onion', createOnionRoutes(workspaceRoot))
   app.route('/api/charter', createCharterRoutes(workspaceRoot))
   app.route('/api/headless', createHeadlessRoutes(workspaceRoot))
